@@ -180,8 +180,9 @@ must hold before the next tier starts.
 ### Tier 0 — Skeleton that deploys
 Gate: a fresh clone deploys to Vercel and the live URL streams a model response.
 
-**Status — Tier 0 tasks 0.1–0.3 built AND live-verified (2026-07-18) with real OpenAI + Supabase
-keys and the migration applied. Only 0.4 (deploy) remains before the tier gate holds.**
+**Status — TIER 0 COMPLETE ✅ (2026-07-18). Deployed to Vercel and gate-verified on the live URL:
+https://cormorant-vert.vercel.app — `/` 200, `/api/health` 200, `/api/chat` streams from
+`gpt-5.6-terra`, `/api/db-check` round-trip `ok:true`. Tier 1 may begin.**
 Built (`npm run build` and `npm run lint` both green):
 - Next.js 16 (App Router) + TypeScript + Tailwind v4 + shadcn/ui scaffold. Base components in
   `components/ui/` (button, input, card, badge, dialog, skeleton). shadcn style is `base-nova`,
@@ -209,10 +210,23 @@ Verified live (local dev server, real credentials):
   row (`source='tier0-db-check'`) — delete both `app/api/db-check/route.ts` and that row before
   the demo so it never shows on the map.
 
-Remaining — **0.4 deploy is the tier gate:** push to the GitHub repo, import to Vercel, set the
-three env vars (`OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`), then confirm the **live**
-URL streams `/api/chat` with `/api/health` green. Only then does the Tier 0 gate hold and Tier 1
-may begin. (Env values load at process start; Next dev also hot-reloads `.env.local` on change.)
+Deployed & gate-verified live on **https://cormorant-vert.vercel.app** (Vercel project
+`cormorant`, git-connected to `main`; the 3 env vars are set for Production + Preview).
+
+Deploy gotchas hit and fixed (do NOT rediscover these):
+1. **Framework preset was "Other".** The initial Vercel import misdetected the framework, so it
+   served the repo as static files and **every route (even `/`) 404'd** although `next build`
+   ran and the deployment was "Ready" (tell: `vercel inspect` Builds showed `. [0ms]`, no
+   `@vercel/next`). Fix: committed `vercel.json` with `{"framework":"nextjs", ...}` (overrides the
+   dashboard preset), pushed, git redeployed correctly. Keep `vercel.json`.
+2. **Deployment Protection (Vercel Authentication) was ON** → the URL 302-redirected to
+   `vercel.com/sso-api` (login wall; judges can't open it). Fix: dashboard → Settings →
+   Deployment Protection → Vercel Authentication → Disabled. Keep it off for the demo.
+- Env values load at process start; Next dev also hot-reloads `.env.local` on change. `.env.local`
+  and `.vercel/` are gitignored; only `.env.example` is tracked. `.vercelignore` keeps env files
+  out of any CLI upload.
+- Reminder still open: delete the temporary `app/api/db-check/route.ts` and its sentinel
+  `companies` row (`source='tier0-db-check'`) before the demo so it never shows on the map.
 
 - [x] **0.1 Scaffold the app.** `create-next-app` (TypeScript, App Router, Tailwind), init
   shadcn/ui, add base components (button, input, card, badge, dialog, skeleton). Placeholder
@@ -231,10 +245,10 @@ may begin. (Env values load at process start; Next dev also hot-reloads `.env.lo
   temporary test route inserts and reads back a row.
   **Done:** tables exist; the round-trip works from a route.
   **Verify:** rows visible in the Supabase dashboard.
-- [ ] **0.4 Deploy.** Push to the GitHub repo, import to Vercel, set env vars
+- [x] **0.4 Deploy.** Push to the GitHub repo, import to Vercel, set env vars
   (`OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`).
   **Done (tier gate):** the production URL streams `/api/chat` and `/api/health` is green —
-  verified on the live URL, not localhost.
+  verified on the live URL, not localhost. ✅ **https://cormorant-vert.vercel.app**
 
 ### Tier 1 — Thesis onboarding
 Gate: a saved thesis object drives a downstream call.
