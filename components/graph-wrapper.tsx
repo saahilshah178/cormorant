@@ -6,7 +6,7 @@ import ForceGraph2D, {
   type LinkObject,
   type NodeObject,
 } from "react-force-graph-2d";
-import { forceRadial } from "d3-force";
+import { forceCollide, forceRadial } from "d3-force";
 import { sectorColor } from "@/lib/sectors";
 
 /**
@@ -85,6 +85,14 @@ export default function GraphWrapper({
         0,
       ).strength(0.85) as never,
     );
+    // Keeps same-fit nodes from stacking on top of each other so every node
+    // stays individually clickable.
+    fg.d3Force(
+      "collide",
+      forceCollide<NodeObject<GraphNode>>(
+        (node) => 3.5 + (node.confidence ?? 0) * 5 + 6,
+      ).strength(0.9) as never,
+    );
     fg.d3ReheatSimulation();
   }, [nodes, links]);
 
@@ -108,11 +116,11 @@ export default function GraphWrapper({
           const r = radiusForFit(fit);
           ctx.beginPath();
           ctx.arc(0, 0, r, 0, 2 * Math.PI);
-          ctx.strokeStyle = "rgba(11,11,11,0.06)";
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = "rgba(11,11,11,0.16)";
+          ctx.lineWidth = 1.25;
           ctx.stroke();
-          ctx.fillStyle = "rgba(11,11,11,0.28)";
-          ctx.font = "5px sans-serif";
+          ctx.fillStyle = "rgba(11,11,11,0.45)";
+          ctx.font = "6px sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "bottom";
           ctx.fillText(`fit ${fit}`, 0, -r - 2);
@@ -156,7 +164,7 @@ export default function GraphWrapper({
         ctx.fillStyle = paintColor;
         // Hit target bigger than the mark: circle plus the label block.
         ctx.beginPath();
-        ctx.arc(x, y, r + 3, 0, 2 * Math.PI);
+        ctx.arc(x, y, r + 4, 0, 2 * Math.PI);
         ctx.fill();
         const w = Math.max(30, node.name.length * fontSize * 0.6);
         ctx.fillRect(x - w / 2, y + r, w, fontSize + 4);
