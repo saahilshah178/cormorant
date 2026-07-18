@@ -31,8 +31,15 @@ adjacent market). As the agent discovers and scores during the demo, nodes drop 
 ### Explicitly out of scope (do not build)
 - Any founder-facing product: no founder application portal, no auto-apply-from-GitHub flow,
   no founder onboarding. One customer only.
-- Multi-tenant auth, billing, teams, roles.
+- Billing, teams, roles.
 - Anything that sends real outbound messages to real people during judging.
+
+**Scope amendment (2026-07-18, post-Tier-3):** per-user Google sign-in was added (see
+"Tier 1.5 — Auth" below), so "multi-tenant auth" is no longer out of scope — each signed-in
+VC gets their own private theses. `companies`/`signals`/`scores` (the pre-indexed dataset)
+stay shared/global across every account; only `theses` rows are user-owned. This was a
+deliberate scope change requested outside the original tier plan, made this close to the
+freeze — flagged as a risk, not silently absorbed.
 
 ### Tiered scope — this is the most important section
 Build strictly in tier order. Do not start a tier until the previous one works end to end and
@@ -330,6 +337,74 @@ Implementation notes:
   test thesis active, `GET /api/rankings` returned its id; after switching the header
   selector to "Pre-seed deeptech", the same call returned `thesis_id` =
   the Pre-seed deeptech id. The cookie is the single source of the active thesis.
+
+### Tier 1.5 — Auth (Google sign-in, per-user theses)
+Added post-Tier-3, outside the original tier order (see scope amendment above).
+Gate: signing in with Google, creating/editing/deleting a thesis, and having only that
+account's theses appear on reload.
+
+**Status — CODE COMPLETE, NOT YET DEPLOYED/VERIFIED LIVE.** `npm run build` and
+`npm run lint` are green, but this needs manual dashboard/console steps (below) before it
+is actually functional, and it has not been exercised end-to-end in a browser yet.
+Everything is uncommitted on `saahil` pending review, per the instruction that started this
+work.
+
+Implementation notes:
+- Auth backend: **Supabase Auth** (same Supabase project, not a separate identity provider),
+  using `@supabase/ssr` for cookie-synced sessions — the one dependency PLAN.md §2 originally
+  said we would NOT need ("no `@supabase/ssr` — only exists to sync auth cookies, which we do
+  not have"). We now have auth cookies, so this is a deliberate reversal of that line, not an
+  oversight.
+- `lib/supabase-browser.ts` / `lib/supabase-server.ts` — new anon-key clients (auth/session
+  only, never data access). `lib/supabase.ts` (service-role, data access) is unchanged and
+  still does all `companies`/`signals`/`scores`/`theses` reads/writes.
+- `lib/auth.ts` — `getCurrentUser()`, the single place every route/page/action asks "who is
+  this."
+- `proxy.ts` (Next.js 16 renamed `middleware.ts` → `proxy.ts`, exported function `proxy` not
+  `middleware` — do not rediscover this, `next build` throws a clear error if you get the
+  export name wrong) — refreshes the session cookie every request and redirects signed-out
+  visits to `/onboarding` or `/dealflow` back to `/`.
+- `app/auth/callback/route.ts` — OAuth code exchange; `components/sign-in-button.tsx` (client,
+  calls `supabase.auth.signInWithOAuth({ provider: "google" })`); `signOutAction` in
+  `app/actions.ts`.
+- `supabase/migrations/20260718140000_theses_auth.sql` — adds nullable `theses.user_id
+  references auth.users(id)` + RLS policy scoped to `auth.uid() = user_id`. Nullable so the
+  two existing seed theses don't need a backfill — they just stop matching any account's
+  queries (orphaned, harmless). RLS is defense-in-depth only: the service-role client used
+  for all app queries bypasses RLS entirely, so `lib/theses.ts` filters by `user_id`
+  explicitly in every query — that app-level filter is the real enforcement.
+- `lib/theses.ts` — every function now takes `userId`; added `updateThesis` / `deleteThesis`.
+  `companies`/`signals`/`scores` stay unscoped/shared across all accounts (the pre-indexed
+  demo dataset is common; only which thesis to score against is personal).
+- `components/thesis-menu.tsx` — header "Thesis menu" button (replaces the old "New thesis"
+  link) opens a dialog: list of the signed-in user's theses, per-row Edit/Delete, "+ New
+  thesis". Delete is immediate (single irreversible click); Edit/Create open `ThesisForm`
+  inline with its own Save button (`updateThesisAction` / `createThesisAction`).
+  `components/thesis-form.tsx` was extended (not duplicated) to serve both create and edit by
+  optionally accepting a `thesis` prop.
+
+**Manual setup required before this is functional (not done by this commit):**
+1. Google Cloud Console → OAuth client (Web application) → note client id/secret.
+2. Supabase dashboard → Authentication → Providers → Google → paste that client id/secret.
+3. Supabase dashboard → Authentication → URL Configuration → Redirect URLs → add
+   `http://localhost:3000/auth/callback` (and the production URL's `/auth/callback` once
+   deployed).
+4. Supabase dashboard → SQL Editor → run
+   `supabase/migrations/20260718140000_theses_auth.sql` (no CLI link set up in this repo, same
+   as Tier 0's migration — see its notes above).
+5. Supabase dashboard → Settings → API → copy the `anon` `public` key into
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local` (and in Vercel project env vars for
+   Production + Preview, alongside the existing three).
+6. Set Vercel Deployment Protection / production env vars to include
+   `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` before deploying.
+
+- [ ] **1.5.1 Google sign-in.** Verify: sign in redirects to Google, back to
+  `/auth/callback`, then `/dealflow`; header shows the account email + Sign out.
+- [ ] **1.5.2 Per-user theses.** Verify: two different Google accounts each see only their
+  own theses in the selector and the Thesis menu.
+- [ ] **1.5.3 Edit/delete via Thesis menu.** Verify: editing a thesis and clicking Save
+  updates it in place (dealflow re-scores against the edited thesis); deleting removes it
+  and, if it was active, falls back to another owned thesis or the onboarding empty state.
 
 ### Tier 2 — Scoring engine
 Gate: every seed company has a score with linked signals, and rankings reorder between the

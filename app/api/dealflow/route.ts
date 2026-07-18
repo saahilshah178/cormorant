@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDealflow } from "@/lib/dealflow";
 import { getActiveThesis, getThesisById } from "@/lib/theses";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * The Tier 3 data layer: everything the deal-flow map AND the ranked board
@@ -14,12 +15,17 @@ import { getActiveThesis, getThesisById } from "@/lib/theses";
  * companies drop onto the map as their rows land.
  */
 export async function GET(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const thesisId = url.searchParams.get("thesisId");
 
   const thesis = thesisId
-    ? await getThesisById(thesisId)
-    : await getActiveThesis();
+    ? await getThesisById(thesisId, user.id)
+    : await getActiveThesis(user.id);
   if (!thesis) {
     return NextResponse.json(
       { error: "No thesis found. Create one at /onboarding first." },

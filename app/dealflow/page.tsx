@@ -2,19 +2,26 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { DealflowView } from "@/components/dealflow-view";
 import { getActiveThesis } from "@/lib/theses";
+import { getCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
  * The deal-flow screen (PLAN.md Tier 3). Server component: resolves the
- * active thesis (cookie) and hands its id to the client view — when the
- * header selector changes the thesis, this re-renders and the view refetches,
- * which is what makes the map resettle (3.4).
+ * signed-in user's active thesis (cookie) and hands its id to the client
+ * view — when the header selector changes the thesis, this re-renders and
+ * the view refetches, which is what makes the map resettle (3.4).
+ *
+ * No signed-out branch here: middleware.ts redirects unauthenticated visits
+ * to `/` before this ever renders.
  */
 export default async function DealflowPage() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+
   let thesis = null;
   let dbError: string | null = null;
   try {
-    thesis = await getActiveThesis();
+    thesis = await getActiveThesis(user.id);
   } catch (err) {
     dbError = err instanceof Error ? err.message : String(err);
   }

@@ -69,4 +69,5 @@ export type Thesis = {
   demographics_pref: string | null;
   raw_thesis_text: string | null;
   created_at: string;
+  user_id: string | null;
 };

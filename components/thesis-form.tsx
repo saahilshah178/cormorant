@@ -1,7 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
-import { createThesisAction, type ThesisFormState } from "@/app/actions";
+import { useActionState, useEffect, useRef } from "react";
+import {
+  createThesisAction,
+  updateThesisAction,
+  type ThesisFormState,
+} from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,30 +13,47 @@ import {
   INDUSTRY_LABELS,
   STAGES,
   STAGE_LABELS,
+  type Thesis,
 } from "@/lib/thesis-schema";
 
 const initialState: ThesisFormState = { error: null };
 
 /**
- * Thesis onboarding form (PLAN.md 1.1). Designed to be completable in ~15
- * seconds: one name, one stage, tick industries, two optional short fields,
- * one free-text box. Server action validates with zod and persists to
- * `theses`, then makes the new thesis active and redirects home.
+ * Thesis form: create (PLAN.md 1.1, onboarding) and edit (Thesis menu,
+ * PLAN.md auth addendum) share these fields. Passing `thesis` switches it
+ * into edit mode — prefilled fields, updateThesisAction instead of
+ * createThesisAction, and `onSaved` instead of a redirect (update stays on
+ * the same page so the Thesis menu can show the list again).
  */
-export function ThesisForm() {
-  const [state, formAction, pending] = useActionState(
-    createThesisAction,
-    initialState,
-  );
+export function ThesisForm({
+  thesis,
+  onSaved,
+}: {
+  thesis?: Thesis;
+  onSaved?: () => void;
+}) {
+  const action = thesis ? updateThesisAction : createThesisAction;
+  const [state, formAction, pending] = useActionState(action, initialState);
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    if (wasPending.current && !pending && !state.error && thesis) {
+      onSaved?.();
+    }
+    wasPending.current = pending;
+  }, [pending, state.error, thesis, onSaved]);
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
+      {thesis ? <input type="hidden" name="id" value={thesis.id} /> : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5 text-sm font-medium">
           Thesis name
           <Input
             name="name"
             placeholder="e.g. Pre-seed deeptech"
+            defaultValue={thesis?.name}
             required
             autoFocus
           />
@@ -43,7 +64,7 @@ export function ThesisForm() {
           <select
             name="stage"
             required
-            defaultValue={STAGES[0]}
+            defaultValue={thesis?.stage ?? STAGES[0]}
             className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {STAGES.map((s) => (
@@ -67,6 +88,7 @@ export function ThesisForm() {
                 type="checkbox"
                 name="industries"
                 value={ind}
+                defaultChecked={thesis?.industries.includes(ind)}
                 className="accent-primary size-4"
               />
               {INDUSTRY_LABELS[ind]}
@@ -81,6 +103,7 @@ export function ThesisForm() {
           <Input
             name="min_traction"
             placeholder="e.g. $1M ARR or working prototype"
+            defaultValue={thesis?.min_traction ?? ""}
           />
         </label>
 
@@ -89,6 +112,7 @@ export function ThesisForm() {
           <Input
             name="demographics_pref"
             placeholder="e.g. technical founding team"
+            defaultValue={thesis?.demographics_pref ?? ""}
           />
         </label>
       </div>
@@ -100,6 +124,7 @@ export function ThesisForm() {
           required
           rows={4}
           placeholder="What do you want to back, and what do you always pass on?"
+          defaultValue={thesis?.raw_thesis_text ?? ""}
           className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         />
       </label>
@@ -112,7 +137,7 @@ export function ThesisForm() {
 
       <div>
         <Button type="submit" size="lg" disabled={pending}>
-          {pending ? "Saving…" : "Save thesis"}
+          {pending ? "Saving…" : thesis ? "Save changes" : "Save thesis"}
         </Button>
       </div>
     </form>
