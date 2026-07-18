@@ -358,13 +358,12 @@ theses), 2 theses. Implementation notes:
   `npm run seed` / `npm run seed:validate`. NOTE: `scripts/` is a new top-level dir (needed
   because `npm run seed` can't live inside app/lib); package.json gained the two entries.
 
-Deploy state (2026-07-18): production (git `main`) still serves Tier 0 and is healthy
-(`/` 200, `/api/health` ok). The Tier 1+2 work is verified on a Vercel **preview**
-deployment built from the working tree (`vercel deploy`) — `/`, `/onboarding`,
-`/api/health`, and `/api/rankings` for both theses all green there. Nothing from this
-session is committed yet (per working agreement: diffs reviewed before commit); after
-review, commit + push to `main` redeploys production with Tiers 1–2, or run
-`vercel deploy --prod`. `npm run build` and `npm run lint` are both green.
+Deploy state (2026-07-18, refreshed after Tier 3): PR #2 merged `saahil` → `main`
+(1bc740f), so **production now serves Tiers 0–2** and is healthy — `/`, `/onboarding`,
+and `/api/rankings` (real scores) all green on cormorant-vert.vercel.app. Tier 3's work
+is uncommitted in the working tree on `saahil`, verified on a fresh Vercel preview
+deployment (see Tier 3 status); committing + merging ships it to production.
+`npm run build` and `npm run lint` green.
 
 - [x] **2.1 Research the seed dataset (agents).** ✅ 43 companies (30–50 band), all ≥2
   signals (125 total), sectors 11-wide, stages 4 pre-seed / 15 seed / 12 A / 12 B;
@@ -397,24 +396,68 @@ review, commit + push to `main` redeploys production with Tiers 1–2, or run
 ### Tier 3 — Deal-flow map + report (the demo)
 Gate: the scripted demo (section 8, steps 1–2 and 4–5) works end to end on seed data.
 
-- [ ] **3.1 CompanyReport component.** Reused by the board and the map panel: fit rationale,
-  confidence badge (with the "speculative, 1 unverified signal" vs "high conviction,
-  6 sources" honesty framing), cited signals as clickable source links, one-line pass reason.
-  **Done:** renders correctly for any scored company id, from DB data.
-- [ ] **3.2 Ranked board (guaranteed fallback).** Cards sorted by fit: score, confidence
-  badge, top-3 cited signals, pass reason; click expands into CompanyReport.
-  **Done:** the entire demo can run on the board alone if the graph misbehaves.
-- [ ] **3.3 Force-graph map.** `react-force-graph-2d` via the `'use client'` wrapper +
-  `dynamic(ssr: false)` pattern from the stack gotchas. Radial position by fit via
-  `forceRadial` (high fit → center), node size by confidence, color by sector, edges between
-  companies sharing a signal (same investor / accelerator / adjacent market).
-  **Done:** the seed set renders and settles smoothly, and node positions visibly correlate
-  with fit scores in the DB.
-- [ ] **3.4 Drill-down + thesis-swap resettle.** Node click → slide-in CompanyReport panel.
-  Thesis switch → nodes animate to their new positions.
-  **Done (tier gate):** demo steps 1, 2, 4, 5 run back-to-back with no dead ends.
-- [ ] **3.5 Map/board toggle.** Both views share the same data layer.
-  **Done:** toggling flips views with no refetch weirdness.
+**Status — TIER 3 COMPLETE ✅ (2026-07-18, gate verified locally in a headless browser
+AND on a fresh Vercel preview deployment). Uncommitted — review the diff, then commit.**
+Implementation notes:
+- `lib/dealflow.ts` + `app/api/dealflow/route.ts` — the ONE data layer both views render
+  from: companies with their score + embedded signals for a thesis (via a nested
+  PostgREST select from `scores`), plus the §6 edges. Edges: shared-investor/accelerator
+  mentions extracted from signal text against a fixed entity list (YC + "Y Combinator"
+  merge to one label; a16z, Benchmark, Accel, …) → 48 edges, and same-sector "adjacent
+  market" pairs → 62. Groups >5 connect ring+chords instead of cliques (the 14-company
+  YC batch would otherwise be 91 edges of hairball).
+- `components/company-report.tsx` (3.1) — report + `ConfidenceBadge` with the honesty
+  framing ("High conviction · 6 sources" / "Moderate evidence · N" / "Speculative · 1
+  thin signal" from confidence × contributing-signal count); bear case as its own
+  destructive-tinted block; cited signals as clickable source links; "N more signals on
+  file didn't drive this score" honesty line.
+- `components/deal-board.tsx` (3.2) — ranked cards (rank, score, sector dot, confidence
+  badge, top-3 cited signals, pass line) → dialog with the full CompanyReport.
+- `components/graph-wrapper.tsx` (3.3) — per the stack gotcha: imports
+  `react-force-graph-2d` directly, holds the ref internally; `deal-map.tsx` wraps THIS
+  file in `dynamic(ssr:false)`. `forceRadial` radius = f(fit) injected after mount,
+  charge weakened to −25, link strength 0.02 (visual, doesn't fight radial), faint
+  fit-80/50/20 guide rings, name label drawn under every node (identity never
+  color-alone), `zoomToFit` once on first settle.
+- Sector colors (`lib/sectors.ts`): 8 validated categorical slots (CVD-checked against
+  the white surface — worst adjacent ΔE 9.1); the three 2-company deep-tech sectors
+  (biotech/space/defense) fold to neutral gray per the >8-slots rule. Legend on the map.
+- `components/dealflow-view.tsx` + `app/dealflow/page.tsx` — data flow: server page
+  resolves the active thesis (cookie) → client view fetches `/api/dealflow?thesisId=`.
+  "Run scoring" POSTs `/api/score` and polls dealflow every 2.5s so companies DROP ONTO
+  THE MAP as their rows land (demo step 2 is a live fill, ~90s for 43 on `terra`).
+  Node objects are cached by company id and MUTATED on refetch — that's what makes
+  thesis swap a resettle animation instead of a fresh layout. Do NOT key the view (or
+  map) by thesis id: a remount resets positions.
+- Tier 1 touch-ups while here: thesis selector got `key={activeId}` (an uncontrolled
+  select ignores `defaultValue` updates — after creating a thesis the header showed the
+  stale name); onboarding now redirects to `/dealflow` (straight into demo step 2);
+  header gained a "Deal flow" link; home CTA → `/dealflow`.
+
+- [x] **3.1 CompanyReport component.** ✅ Verified for map panel and board dialog from
+  live DB data (Chalk: fit 36 vs deeptech with "Moderate evidence · 3 sources"; same
+  company fit 15 vs consumer with a consumer-specific bear case — the report is
+  thesis-relative all the way down).
+- [x] **3.2 Ranked board (guaranteed fallback).** ✅ All 43 ranked cards render (consumer
+  thesis: Partiful 93 / Copilot Money 92 / Praktika AI 89 — matches the Tier 2 gate);
+  card click → full report dialog with working citation links.
+- [x] **3.3 Force-graph map.** ✅ 43 nodes + 110 edges settle smoothly; radial-by-fit
+  visibly correct on both seeded theses (deeptech thesis: pre-seed deeptech center,
+  consumer periphery; consumer thesis: the exact inversion). No console errors.
+- [x] **3.4 Drill-down + thesis-swap resettle.** ✅ Node click slides in the report
+  panel; header thesis swap refetches and the SAME pool re-settles (an open panel even
+  live-updates its numbers for the new thesis). **Tier gate:** demo steps 1→2→4→5 ran
+  back-to-back in one headless-browser session: onboarded a fresh thesis (seconds),
+  Run scoring filled the map live (43/43, 0 failures, on-thesis companies visibly
+  center), drill-down showed cited fit + sharp pass reason, swap reordered. Temp QA
+  thesis + its 43 scores deleted afterwards (cascade) to keep the demo pool clean.
+- [x] **3.5 Map/board toggle.** ✅ Same payload feeds both views; toggling is pure client
+  state, zero refetch.
+
+Verified on Vercel preview (built from the working tree, `vercel deploy`):
+`/`, `/dealflow`, `/onboarding`, `/api/health`, `/api/dealflow`, `/api/rankings` all
+green; map renders and node-click drill-down works on the deployed URL
+(cormorant-4pl7tijvs-saahilshah178s-projects.vercel.app). Production (`main`) untouched.
 
 ### Tier 4 — Live multi-agent discovery (real background pipeline)
 Gate: a discovery run adds ≥1 new scored node in the background — verified by starting a run,

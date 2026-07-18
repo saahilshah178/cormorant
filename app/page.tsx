@@ -43,14 +43,14 @@ export default function Home() {
       </p>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Link href="/onboarding" className={cn(buttonVariants({ size: "lg" }))}>
-          Describe your thesis
+        <Link href="/dealflow" className={cn(buttonVariants({ size: "lg" }))}>
+          Open the deal flow
         </Link>
         <Link
-          href="/dev"
+          href="/onboarding"
           className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
         >
-          Dev console
+          Describe your thesis
         </Link>
       </div>
 
