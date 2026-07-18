@@ -45,7 +45,10 @@ no "just one more hour."
 - Tier 1 — Thesis onboarding. (gate: a thesis object is saved and drives scoring)
 - Tier 2 — Scoring engine over a pre-indexed company set, with traceable signals + citations.
 - Tier 3 — The deal-flow map + company report drill-down. (this is the demo)
-- Tier 4 — Live discovery/scrape shown as a timelapse. (nice-to-have, adds the "it's real" proof)
+- Tier 4 — Live multi-agent discovery: parallel scraper agents + review agents + a grading
+  agent run as a durable background pipeline (survives closing the tab), adding newly scored
+  companies on top of the preset set. This is the actual ongoing-deal-flow product, not just a
+  demo trick — but it still builds after Tiers 0–3 and is the first tier cut if time runs short.
 - Tier 5 — Outreach + Calendly + calendar population. (CUT FIRST if behind)
 - Tier 6 — Polish, error states, seed data, demo script, video.
 
@@ -69,15 +72,24 @@ no "just one more hour."
 - Deploy: Vercel
 - Graph visual: `react-force-graph-2d` (canvas-only, no three.js) for the deal-flow map,
   with `d3-force`'s `forceRadial` for the radial-by-fit layout
-- Scraping/discovery (Tier 4): a simple server-side fetch + parse over a fixed source list;
-  no headless browser unless unavoidable
+- Discovery pipeline (Tier 4): a multi-agent pipeline — parallel scraper agents over a fixed
+  source list (YC directory, Product Hunt launches, HN Show/Launches, GitHub trending,
+  Wellfound) plus a search-API agent (Exa or Tavily — pick whichever key is fastest to get)
+  for a secondary broaden-the-net pass, a review agent that dedupes/validates/extracts
+  signals, and a grading agent that reuses `scoreCompany` (section 5) as-is. Orchestrated with
+  **Vercel Workflow DevKit** (`workflow` + `@workflow/next` + `@workflow/ai`) so a run is a
+  true durable background job — it keeps running server-side even if the VC closes the tab —
+  rather than a request tied to an open connection. No headless browser unless unavoidable.
 
 Sponsor-fit note: this stack naturally stacks OpenAI (reasoning) + Supabase (data) and can
 add Databricks framing (confidence-aware insights). Do not bolt on APIs that do not earn
 their place.
 
 Infra status: OpenAI API key, Supabase project, Vercel account, and the public GitHub repo
-all exist already. Tier 0 is wiring, not signup.
+all exist already. Tier 0 is wiring, not signup. Tier 4 adds one new signup: a search-API key
+(Exa or Tavily) for the broaden-the-net agent. Workflow DevKit itself needs no separate
+account — it deploys as part of the existing Vercel project — but verify at build time whether
+anything needs enabling in the dashboard for it to run there.
 
 ### Stack gotchas (verified against docs/npm, July 2026 — do not rediscover these)
 - AI SDK v7: `generateObject`/`streamObject` are **deprecated**. Structured JSON is
@@ -96,6 +108,23 @@ all exist already. Tier 0 is wiring, not signup.
   Inject the radial force after mount: `fgRef.d3Force('radial', forceRadial(...))` and
   weaken charge. If the force fighting gets fiddly, a raw `d3-force` + canvas fallback is
   ~50 nodes of trivial work and fully controllable.
+- Workflow DevKit: `"use workflow"` orchestrator functions run in a sandboxed VM (no `fetch`,
+  no `setTimeout`, no Node built-ins) — put actual work (fetch calls, OpenAI calls, Supabase
+  writes) in `"use step"` functions, which have full Node.js access plus automatic retry and
+  cached/replayed results. The workflow function itself should only call steps.
+- `start()` (from `workflow/api`) kicks off a run directly from an API route, but if a
+  workflow ever needs to start another workflow from inside itself, `start()` must be wrapped
+  in a `"use step"` function first — it cannot be called directly in workflow context.
+- Stop control for continuous-mode discovery runs: a `createHook()` inside the workflow with a
+  deterministic token (e.g. `discovery-stop-{runId}`); the Settings panel's "Stop" button calls
+  `resumeHook(token, { stop: true })` from an API route to break the loop cleanly.
+- Live agent-activity log: use namespaced streams —
+  `getWritable({ namespace: 'logs:scraper' })` / `'logs:review'` / `'logs:grading'` — read back
+  with `run.getReadable({ namespace })`. Keeps the verbose per-agent log separate from the
+  default stream, which should only carry "new company inserted" events the map needs.
+- `DurableAgent` (`@workflow/ai/agent`) handles the workflow-sandbox `fetch` wiring
+  automatically — use it for the scraper/review/grading LLM calls instead of raw
+  `generateText` inside a workflow function.
 
 ---
 
@@ -110,9 +139,21 @@ all exist already. Tier 0 is wiring, not signup.
   fit_rationale (text), pass_reason (text), contributing_signal_ids[], scored_at
 - `outreach` (Tier 5 only): id, company_id, status (not_contacted | contacted | responded |
   booked | needs_info), scheduled_at, notes
+- `discovery_runs` (Tier 4 only): id, mode (batch | continuous), target_count (int, nullable —
+  batch only), status (running | stopped | completed | failed), workflow_run_id (text, the
+  Workflow DevKit run id — used to reattach/stream/cancel after a page reload), thesis_id,
+  companies_found (int, default 0), started_at, stopped_at
+- `discovery_instructions` (Tier 4 only): id, text, active (bool, default true), created_at —
+  persistent free-text guidance the VC gives the discovery agents (e.g. "prioritize fintech
+  infra, avoid consumer social"); every active row is concatenated into the scraper/review/
+  grading prompts on every future run
 
 Every number a VC sees must trace back to rows in `signals` via `contributing_signal_ids`.
 That traceability is the product. No score without its signals.
+
+Discovered companies land in the exact same `companies` / `signals` / `scores` tables as the
+preset set — tagged via `source` (e.g. `discovery:producthunt`, `discovery:search`) — so the
+map/board render them identically with zero special-casing downstream.
 
 ---
 
@@ -122,12 +163,19 @@ Before the demo, seed 30–50 real companies with real signals so the agent reas
 reliable data instead of gambling on live scrape latency. Store as a seed script that
 populates `companies` and `signals`. Include at least a handful of companies with genuinely
 non-obvious pass reasons, because the sharp bear case is the wow moment and it must be real,
-not generic. The live scrape (Tier 4) runs on top of this as a timelapse, not as the thing
-the demo depends on.
+not generic. The Tier 4 discovery pipeline runs on top of this set, not as the thing the demo
+depends on.
 
 The dataset is compiled by research agents (task 2.1), not hand-invented: real companies,
 real signals, real clickable source URLs. A judge who clicks a citation must land on a page
 that supports it.
+
+This is a distinct mechanism from the Tier 4 discovery pipeline. Task 2.1 is a one-time,
+offline compilation run by us before the demo, producing the guaranteed-good preset 30–50.
+Tier 4 is a live pipeline the VC kicks off at demo time that keeps finding and scoring new
+companies in the background — on top of the preset set, never touching it — for as long as
+the run is active. The preset set is what makes the demo safe; the live pipeline is what makes
+the product real.
 
 ---
 
@@ -314,18 +362,45 @@ Gate: the scripted demo (section 8, steps 1–2 and 4–5) works end to end on s
 - [ ] **3.5 Map/board toggle.** Both views share the same data layer.
   **Done:** toggling flips views with no refetch weirdness.
 
-### Tier 4 — Live discovery timelapse (nice-to-have)
-Gate: the agent adds ≥1 new scored node live without breaking anything.
+### Tier 4 — Live multi-agent discovery (real background pipeline)
+Gate: a discovery run adds ≥1 new scored node in the background — verified by starting a run,
+closing the tab, and finding the new node on reload.
 
-- [ ] **4.1 Discovery pipeline.** Server route: fetch + parse a small fixed source list →
-  extract candidate company + signals with the cheap model → insert → score with the main
-  model → return the new node. Timeouts and failure isolation: any error leaves existing
-  data untouched.
-  **Done:** invoking discovery inserts ≥1 new company with signals and a score.
-- [ ] **4.2 Discovery UI.** "Run discovery" control; streaming log of agent steps; the new
-  node drops into the map and settles.
-  **Done:** demo step 3 works on camera; killing the network mid-run breaks nothing already
-  on screen.
+- [ ] **4.1 Discovery data model.** Migration adding `discovery_runs` and
+  `discovery_instructions` (section 3).
+  **Done:** tables exist; a hand-inserted `discovery_instructions` row is readable.
+- [ ] **4.2 Source integrations.** One fetch+parse function per fixed source (YC directory,
+  Product Hunt, HN Show/Launches, GitHub trending, Wellfound) returning raw candidate mentions
+  (name, snippet, source_url). One search-API function (Exa or Tavily) taking a query string
+  and returning the same shape, for the broaden-the-net pass.
+  **Done:** each source function returns ≥1 real candidate when run standalone.
+- [ ] **4.3 Discovery workflow (Workflow DevKit).** A `"use workflow"` orchestrator wiring:
+  parallel scraper-agent steps (one per fixed source + the search-API step, each reading the
+  active thesis + active `discovery_instructions` as context) → parallel review-agent steps
+  (dedupe against existing `companies` by name/domain, verify the source_url actually supports
+  the claim, extract structured `signals` with the cheap model, reject anything without a
+  citable URL) → a grading-agent step that calls the same `scoreCompany` from Tier 2, unchanged
+  → an insert step (company + signals + score, tagged `source='discovery:<name>'`) that
+  increments `discovery_runs.companies_found`. Loop control: batch mode stops at
+  `target_count`; continuous mode loops with a `sleep()` between rounds and a `createHook()`
+  stop signal checked each round. Every step is isolated — one candidate or source erroring
+  never drops data already inserted.
+  **Done:** `start()`ing the workflow inserts ≥1 new company with signals and a score, in both
+  batch and continuous mode; resuming the stop hook ends a continuous run cleanly.
+  **Verify:** kill the network mid-run — nothing already inserted is lost or duplicated on
+  retry.
+- [ ] **4.4 Discovery settings UI.** A settings panel: mode toggle (batch with a target-count
+  input, default 5–10, vs continuous), start/stop controls (`start()` / stop-hook resume), a
+  free-text instructions box that upserts into `discovery_instructions` and visibly steers the
+  next run, and a live agent-activity log reading the namespaced streams (`logs:scraper` /
+  `logs:review` / `logs:grading`).
+  **Done:** starting a batch run from the UI, closing the tab, and reopening the app later
+  shows the completed run's new companies already on the map.
+- [ ] **4.5 Map integration.** Discovered companies render on the map/board exactly like seed
+  companies (same data layer, no special-casing) and drop in live while a run is active and
+  the panel is open.
+  **Done (tier gate):** demo step 3 works on camera — a run kicked off live adds a node that
+  visibly settles into position by fit score.
 
 ### Tier 5 — Outreach + Calendly (CUT FIRST IF BEHIND)
 Gate: a one-button flow updates status end to end.
@@ -357,7 +432,8 @@ Gate: nothing crashes on camera; video recorded with buffer.
 ## 8. Scripted demo test case (build toward this exact sequence)
 1. VC onboards with a specific thesis in ~15 seconds.
 2. Hit run; the seed set scores; the deal-flow map fills, companies settling by fit.
-3. (Tier 4) kick off live discovery; a new company node drops in and scores on camera.
+3. (Tier 4) kick off live discovery (batch or continuous, from the Settings panel); a new
+   company node drops in and scores on camera while the rest of the demo continues.
 4. Click the standout company: strong cited fit thesis + a sharp, specific pass reason.
 5. Swap to a second thesis; the same pool visibly reorders.
 6. (Tier 5, only if built) one-click reach out; node flips to "contacted".
