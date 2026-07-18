@@ -180,18 +180,52 @@ must hold before the next tier starts.
 ### Tier 0 — Skeleton that deploys
 Gate: a fresh clone deploys to Vercel and the live URL streams a model response.
 
-- [ ] **0.1 Scaffold the app.** `create-next-app` (TypeScript, App Router, Tailwind), init
+**Status — Tier 0 tasks 0.1–0.3 built AND live-verified (2026-07-18) with real OpenAI + Supabase
+keys and the migration applied. Only 0.4 (deploy) remains before the tier gate holds.**
+Built (`npm run build` and `npm run lint` both green):
+- Next.js 16 (App Router) + TypeScript + Tailwind v4 + shadcn/ui scaffold. Base components in
+  `components/ui/` (button, input, card, badge, dialog, skeleton). shadcn style is `base-nova`,
+  which is built on **@base-ui** (not Radix): its `Button` has **no `asChild`** — style a
+  `Link` with `buttonVariants(...)` instead (see `app/page.tsx`).
+- `app/api/health/route.ts` → `{ ok: true }` (verified: 200).
+- `app/api/chat/route.ts` — AI SDK v7 streaming (`streamText` → `toUIMessageStreamResponse()`).
+  Note: `convertToModelMessages` is **async** in `ai@7` — must be `await`ed. SSE stream protocol
+  verified end-to-end (start → parts → done); real tokens need the key (see Pending).
+- `app/dev/page.tsx` — client test console: `useChat` stream view + buttons for the endpoints.
+- `lib/models.ts` — pins the two model ids (`reasoning`/`cheap`) and the OpenAI provider.
+- `lib/supabase.ts` — server-only admin client (lazy; throws a clear error if env is unset).
+- `supabase/migrations/20260718120000_init.sql` — the full §3 schema (incl. the Tier 5
+  `outreach` table, so no re-migration later). `app/api/db-check/route.ts` is a **temporary**
+  insert+read-back round-trip route (idempotent) — delete it once 0.3 is confirmed live.
+- Installed deps: `ai@7`, `@ai-sdk/react@4`, `@ai-sdk/openai@4` (majors intentionally differ,
+  per §2), `@supabase/supabase-js@2`. `.env.example` documents the three vars.
+
+Verified live (local dev server, real credentials):
+- `/api/health` → 200. `/api/chat` streamed token-by-token from `gpt-5.6-terra`. Both pinned
+  ids (`gpt-5.6-terra`, `gpt-5.6-luna`) were confirmed to exist in the OpenAI account via
+  `GET /v1/models` — so `lib/models.ts` needs no change.
+- Supabase migration applied through the dashboard SQL Editor (CLI not required); `/api/db-check`
+  insert + read-back returns `ok:true`. NOTE: that temporary route left one sentinel `companies`
+  row (`source='tier0-db-check'`) — delete both `app/api/db-check/route.ts` and that row before
+  the demo so it never shows on the map.
+
+Remaining — **0.4 deploy is the tier gate:** push to the GitHub repo, import to Vercel, set the
+three env vars (`OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`), then confirm the **live**
+URL streams `/api/chat` with `/api/health` green. Only then does the Tier 0 gate hold and Tier 1
+may begin. (Env values load at process start; Next dev also hot-reloads `.env.local` on change.)
+
+- [x] **0.1 Scaffold the app.** `create-next-app` (TypeScript, App Router, Tailwind), init
   shadcn/ui, add base components (button, input, card, badge, dialog, skeleton). Placeholder
   home page with the product name.
   **Done:** `npm run dev` serves a styled page with shadcn components rendering.
   **Verify:** open localhost — styled placeholder, no console errors.
-- [ ] **0.2 Streaming LLM route.** `/api/health` returns `{ ok: true }`. `/api/chat` streams
+- [x] **0.2 Streaming LLM route.** `/api/health` returns `{ ok: true }`. `/api/chat` streams
   an OpenAI completion via the AI SDK (`streamText` → `toUIMessageStreamResponse()`).
   Minimal test UI renders the stream. Create `lib/models.ts` here, pinning the two model ids
   (section 2) after checking them against the OpenAI platform docs.
   **Done:** the local test page shows a response streaming token-by-token (not one blob).
   **Verify:** watch the stream; `curl /api/health` returns 200.
-- [ ] **0.3 Supabase schema + server client.** Server-only Supabase client using the secret
+- [x] **0.3 Supabase schema + server client.** Server-only Supabase client using the secret
   (service-role) key (all DB access stays server-side; env var not `NEXT_PUBLIC_`-prefixed).
   One migration implementing the section 3 schema, applied via `supabase db push`. A
   temporary test route inserts and reads back a row.
