@@ -33,7 +33,8 @@ export async function createThesisAction(
   jar.set(ACTIVE_THESIS_COOKIE, thesis.id, { path: "/" });
 
   revalidatePath("/", "layout");
-  redirect("/");
+  // Straight into demo step 2: the new thesis's (empty) deal flow, ready to run.
+  redirect("/dealflow");
 }
 
 export async function setActiveThesisAction(thesisId: string): Promise<void> {

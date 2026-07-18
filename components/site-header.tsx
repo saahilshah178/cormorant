@@ -23,9 +23,17 @@ export async function SiteHeader() {
   return (
     <header className="border-b">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-3">
-        <Link href="/" className="text-lg font-semibold tracking-tight">
-          Cormorant
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-lg font-semibold tracking-tight">
+            Cormorant
+          </Link>
+          <Link
+            href="/dealflow"
+            className="text-muted-foreground hover:text-foreground text-sm"
+          >
+            Deal flow
+          </Link>
+        </div>
         <div className="flex items-center gap-3">
           <ThesisSelector theses={theses} activeId={activeId} />
           <Link

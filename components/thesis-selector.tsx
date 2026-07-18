@@ -23,6 +23,9 @@ export function ThesisSelector({
 
   return (
     <select
+      // Remount when the active thesis changes elsewhere (e.g. creating a new
+      // thesis): an uncontrolled select ignores defaultValue updates.
+      key={activeId ?? "none"}
       aria-label="Active thesis"
       className="border-input h-8 max-w-56 rounded-md border bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
       defaultValue={activeId ?? undefined}
