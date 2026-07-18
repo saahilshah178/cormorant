@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getActiveThesis, getThesisById } from "@/lib/theses";
+import { getCurrentUser } from "@/lib/auth";
 import {
   scoreCompany,
   type CompanyRow,
@@ -24,6 +25,11 @@ export const maxDuration = 300;
 const CONCURRENCY = 4;
 
 export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
   let body: { thesisId?: string; force?: boolean; companies?: string[] } = {};
   try {
     body = await req.json();
@@ -32,8 +38,8 @@ export async function POST(req: Request) {
   }
 
   const thesis = body.thesisId
-    ? await getThesisById(body.thesisId)
-    : await getActiveThesis();
+    ? await getThesisById(body.thesisId, user.id)
+    : await getActiveThesis(user.id);
   if (!thesis) {
     return NextResponse.json(
       { error: "No thesis found. Create one at /onboarding first." },

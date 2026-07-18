@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SignInButton } from "@/components/sign-in-button";
+import { getCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -25,7 +27,9 @@ const pillars = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const user = await getCurrentUser();
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 py-16">
       <div className="flex items-center gap-3">
@@ -43,15 +47,21 @@ export default function Home() {
       </p>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Link href="/dealflow" className={cn(buttonVariants({ size: "lg" }))}>
-          Open the deal flow
-        </Link>
-        <Link
-          href="/onboarding"
-          className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
-        >
-          Describe your thesis
-        </Link>
+        {user ? (
+          <>
+            <Link href="/dealflow" className={cn(buttonVariants({ size: "lg" }))}>
+              Open the deal flow
+            </Link>
+            <Link
+              href="/onboarding"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+            >
+              Describe your thesis
+            </Link>
+          </>
+        ) : (
+          <SignInButton />
+        )}
       </div>
 
       <div className="mt-14 grid gap-4 sm:grid-cols-3">

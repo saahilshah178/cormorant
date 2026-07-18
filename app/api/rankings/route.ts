@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getActiveThesis, getThesisById } from "@/lib/theses";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * Ranked deal flow for a thesis (PLAN.md 2.5): top companies by fit_score.
@@ -13,6 +14,11 @@ import { getActiveThesis, getThesisById } from "@/lib/theses";
  * GET /api/rankings?limit=N    -> top N (default 10).
  */
 export async function GET(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const thesisId = url.searchParams.get("thesisId");
   const limit = Math.max(
@@ -21,8 +27,8 @@ export async function GET(req: Request) {
   );
 
   const thesis = thesisId
-    ? await getThesisById(thesisId)
-    : await getActiveThesis();
+    ? await getThesisById(thesisId, user.id)
+    : await getActiveThesis(user.id);
   if (!thesis) {
     return NextResponse.json(
       { error: "No thesis found. Create one at /onboarding first." },
