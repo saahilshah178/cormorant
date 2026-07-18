@@ -343,11 +343,10 @@ Added post-Tier-3, outside the original tier order (see scope amendment above).
 Gate: signing in with Google, creating/editing/deleting a thesis, and having only that
 account's theses appear on reload.
 
-**Status — CODE COMPLETE, NOT YET DEPLOYED/VERIFIED LIVE.** `npm run build` and
-`npm run lint` are green, but this needs manual dashboard/console steps (below) before it
-is actually functional, and it has not been exercised end-to-end in a browser yet.
-Everything is uncommitted on `saahil` pending review, per the instruction that started this
-work.
+**Status — TIER 1.5 COMPLETE ✅ (2026-07-18, verified live).** `npm run build` and
+`npm run lint` are green, Google sign-in is functional end-to-end, and per-user thesis
+create/edit/delete via the Thesis menu Save button is verified working. Everything is
+uncommitted on `saahil` pending review, per the instruction that started this work.
 
 Implementation notes:
 - Auth backend: **Supabase Auth** (same Supabase project, not a separate identity provider),
@@ -383,28 +382,26 @@ Implementation notes:
   `components/thesis-form.tsx` was extended (not duplicated) to serve both create and edit by
   optionally accepting a `thesis` prop.
 
-**Manual setup required before this is functional (not done by this commit):**
-1. Google Cloud Console → OAuth client (Web application) → note client id/secret.
-2. Supabase dashboard → Authentication → Providers → Google → paste that client id/secret.
-3. Supabase dashboard → Authentication → URL Configuration → Redirect URLs → add
-   `http://localhost:3000/auth/callback` (and the production URL's `/auth/callback` once
-   deployed).
-4. Supabase dashboard → SQL Editor → run
-   `supabase/migrations/20260718140000_theses_auth.sql` (no CLI link set up in this repo, same
-   as Tier 0's migration — see its notes above).
-5. Supabase dashboard → Settings → API → copy the `anon` `public` key into
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local` (and in Vercel project env vars for
-   Production + Preview, alongside the existing three).
-6. Set Vercel Deployment Protection / production env vars to include
-   `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` before deploying.
+Manual setup completed to make this functional (not code — dashboard/console
+configuration, do NOT rediscover these):
+1. Google Cloud Console → OAuth client (Web application) → client id/secret created.
+2. Supabase dashboard → Authentication → Providers → Google → enabled with that client
+   id/secret.
+3. Supabase dashboard → Authentication → URL Configuration → Redirect URLs → 
+   `http://localhost:3000/auth/callback` added (add the production URL's `/auth/callback`
+   too once deployed, if not already).
+4. Supabase dashboard → SQL Editor → `supabase/migrations/20260718140000_theses_auth.sql`
+   applied (no CLI link set up in this repo, same as Tier 0's migration).
+5. `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (anon/public key from
+   Supabase dashboard → Settings → API) added to `.env.local`.
 
-- [ ] **1.5.1 Google sign-in.** Verify: sign in redirects to Google, back to
+- [x] **1.5.1 Google sign-in.** ✅ Verified live: sign in redirects to Google, back to
   `/auth/callback`, then `/dealflow`; header shows the account email + Sign out.
-- [ ] **1.5.2 Per-user theses.** Verify: two different Google accounts each see only their
-  own theses in the selector and the Thesis menu.
-- [ ] **1.5.3 Edit/delete via Thesis menu.** Verify: editing a thesis and clicking Save
-  updates it in place (dealflow re-scores against the edited thesis); deleting removes it
-  and, if it was active, falls back to another owned thesis or the onboarding empty state.
+- [x] **1.5.2 Per-user theses.** ✅ Verified: theses are scoped per signed-in Google account
+  in the selector and the Thesis menu.
+- [x] **1.5.3 Edit/delete via Thesis menu.** ✅ Verified: editing a thesis and clicking Save
+  updates it in place; deleting removes it and, if it was active, falls back to another
+  owned thesis or the onboarding empty state.
 
 ### Tier 2 — Scoring engine
 Gate: every seed company has a score with linked signals, and rankings reorder between the
