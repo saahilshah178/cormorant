@@ -301,44 +301,98 @@ Deploy gotchas hit and fixed (do NOT rediscover these):
 ### Tier 1 — Thesis onboarding
 Gate: a saved thesis object drives a downstream call.
 
-- [ ] **1.1 Onboarding form.** Fields: stage, industries (multi-select), min traction,
+**Status — TIER 1 COMPLETE ✅ (2026-07-18, verified locally end-to-end).**
+Implementation notes:
+- `lib/thesis-schema.ts` — client-safe zod schema + STAGES/INDUSTRIES constants (split out
+  because the form is a client component and `lib/theses.ts` pulls in `next/headers`).
+- `lib/theses.ts` — server-side thesis DB access + the active-thesis **cookie**
+  (`cormorant_active_thesis`). Active thesis = cookie-selected if it exists, else oldest
+  thesis, else null. All downstream calls resolve the thesis via `getActiveThesis()`.
+- `app/actions.ts` — server actions: `createThesisAction` (zod-validated, sets the new
+  thesis active, redirects home) and `setActiveThesisAction` (selector).
+- `app/onboarding/page.tsx` + `components/thesis-form.tsx` — the form (native
+  select/checkboxes, shadcn Input/Button/Card; base-nova has no Select component).
+- `components/site-header.tsx` (+ `thesis-selector.tsx`) in the root layout — brand,
+  active-thesis `<select>`, "New thesis" link. Header survives a dead DB (try/catch).
+
+- [x] **1.1 Onboarding form.** Fields: stage, industries (multi-select), min traction,
   demographic prefs, free-text thesis. Zod-validated; persists to `theses` via a server
   action.
-  **Done:** submitting creates a `theses` row matching the inputs.
-  **Verify:** the form is completable in ~15 seconds (demo step 1 pace).
-- [ ] **1.2 Two theses + active selector.** Seed two contrasting theses (pre-seed deeptech;
+  **Done:** submitting creates a `theses` row matching the inputs. ✅ Verified via headless
+  browser: submitted a "Seed climate test" thesis (7 quick fields, well under 15s pace);
+  the `theses` row matched the inputs exactly (stage `seed`, industries
+  `[fintech, climate]`, min_traction preserved). Test row deleted afterwards to keep the
+  demo pool clean.
+- [x] **1.2 Two theses + active selector.** Seed two contrasting theses (pre-seed deeptech;
   Series A consumer). Header selector sets the active thesis, readable server-side.
   **Done:** switching the selector changes which thesis id downstream calls receive.
-  **Verify:** inspect a downstream call after switching — the id changes.
+  ✅ Both theses seeded by `npm run seed` (idempotent, matched by name). Verified: with the
+  test thesis active, `GET /api/rankings` returned its id; after switching the header
+  selector to "Pre-seed deeptech", the same call returned `thesis_id` =
+  the Pre-seed deeptech id. The cookie is the single source of the active thesis.
 
 ### Tier 2 — Scoring engine
 Gate: every seed company has a score with linked signals, and rankings reorder between the
 two theses.
 
-- [ ] **2.1 Research the seed dataset (agents).** Research agents compile 30–50 real
-  companies with real signals (section 4) into a typed data file: each company ≥2 signals,
-  every signal a real `source_url`, ≥5 companies with genuinely non-obvious pass-reason
-  material, sectors/stages spread so the two theses rank them differently.
-  **Done:** a small validation script confirms shape (URL format, valid signal kinds, counts).
-  **Verify:** spot-click 10 random source URLs — each loads and supports its signal.
-- [ ] **2.2 Seed script.** Idempotent `npm run seed` populating `companies` + `signals`
-  (upsert; re-run safe). Also seeds the two theses if absent.
-  **Done:** DB matches the data file; re-running does not duplicate rows.
-- [ ] **2.3 `scoreCompany(thesis, signals)`.** Structured JSON output via the AI SDK
-  (`generateText` + `Output.object({ schema })` — see stack gotchas), validated with the
-  section 5 zod schema. Prompt per section 5; retry on invalid output.
-  **Done:** three hand-picked sample companies return valid JSON with specific, falsifiable
-  pass reasons and `contributing_signal_ids` ⊆ the input signal ids.
-  **Verify:** read the outputs — "the market is competitive"-grade reasons are bugs.
-- [ ] **2.4 Batch scoring.** Score the whole seed set against the active thesis
-  (concurrency-limited), persisting to `scores`.
-  **Done:** a `scores` row per company for the active thesis, each with non-empty
+**Status — TIER 2 COMPLETE ✅ (2026-07-18, gate verified locally AND on a Vercel preview
+deployment).** DB state after completion: 43 companies, 125 signals, 86 scores (43 × 2
+theses), 2 theses. Implementation notes:
+- `lib/seed-data.json` — the pre-indexed dataset: 43 real companies, every signal with a
+  real source URL, compiled by 5 parallel research agents (sonnet/haiku for the sector
+  batches, opus for the bear-case batch) with every URL WebFetch-verified at research time.
+  Curation calls: Ramp dropped (its own signals cite a $750M Series D — outside the
+  pre_seed..series_b range), Rime re-sectored healthcare → enterprise_saas. Includes 8
+  companies picked specifically for sharp, citable bear cases (Cluely's admitted-fabricated
+  ARR, Sakana AI's retracted 100x-speedup claim, Rabbit's 5%-active retention collapse,
+  11x's fake customer logos, Thinking Machines' founder exodus, etc.) — the §4 "genuinely
+  non-obvious pass reasons" requirement, documented with press citations.
+- `lib/scoring.ts` — `scoreCompany(thesis, company, signals)`: `generateText` +
+  `Output.object({ schema })` on `gpt-5.6-terra`, zod-validated, up to 3 attempts with the
+  validation failure fed back; rejects invented signal ids and generic pass reasons.
+- `app/api/score/route.ts` — batch scoring, POST `{thesisId?, force?, companies?}`;
+  active-thesis fallback (the Tier 1 downstream call), 4-way concurrency, upsert on
+  `(company_id, thesis_id)`, per-company failure isolation, `maxDuration = 300`.
+- `app/api/rankings/route.ts` — GET top-N by fit for the active (or `?thesisId=`) thesis.
+- `scripts/seed.mjs` + `scripts/validate-seed.mjs` (plain Node, no new deps) —
+  `npm run seed` / `npm run seed:validate`. NOTE: `scripts/` is a new top-level dir (needed
+  because `npm run seed` can't live inside app/lib); package.json gained the two entries.
+
+Deploy state (2026-07-18): production (git `main`) still serves Tier 0 and is healthy
+(`/` 200, `/api/health` ok). The Tier 1+2 work is verified on a Vercel **preview**
+deployment built from the working tree (`vercel deploy`) — `/`, `/onboarding`,
+`/api/health`, and `/api/rankings` for both theses all green there. Nothing from this
+session is committed yet (per working agreement: diffs reviewed before commit); after
+review, commit + push to `main` redeploys production with Tiers 1–2, or run
+`vercel deploy --prod`. `npm run build` and `npm run lint` are both green.
+
+- [x] **2.1 Research the seed dataset (agents).** ✅ 43 companies (30–50 band), all ≥2
+  signals (125 total), sectors 11-wide, stages 4 pre-seed / 15 seed / 12 A / 12 B;
+  13 early-deeptech vs 14 later-consumer so the theses must reorder. `npm run seed:validate`
+  passes (shape, URL format, signal kinds, counts, bear-case coverage, thesis-contrast
+  minimums). **Verify:** an independent spot-check agent re-fetched 12 random signals across
+  12 companies: 11/12 load AND support their claim; the 1 partial (Zephyr Fusion funding
+  signal citing the homepage for YC-batch details) was fixed by swapping its source_url to
+  the YC company page, in both the data file and the DB.
+- [x] **2.2 Seed script.** ✅ Idempotent, verified: second run reports 0 created /
+  43 updated / 125 signals already present. Matches companies by name, signals by
+  (company_id, kind, source_url), theses by name.
+- [x] **2.3 `scoreCompany(thesis, signals)`.** ✅ Sample run (Val Town, Modal Labs, Partiful
+  vs Pre-seed deeptech): all valid JSON, `contributing_signal_ids` ⊆ input ids (checked in
+  DB), and pass reasons specific+falsifiable (e.g. Partiful fit=5: "consumer social-event
+  app already through a $20M Series A ... no signal indicates any target deeptech category
+  or defensible IP"). No "market is competitive"-grade output observed in any of the 86
+  final scores' spot reads.
+- [x] **2.4 Batch scoring.** ✅ All 43 companies scored for each thesis (concurrency 4,
+  ~25s per 20-company batch, 0 failures across 86 scores); every row has non-empty
   `contributing_signal_ids`.
-- [ ] **2.5 Re-score on thesis switch + reorder check.** Switching the active thesis scores
-  (or reuses cached scores for) that thesis. A quick script/route prints top-10 by fit for
-  both theses.
-  **Done (tier gate):** both theses fully scored; the two top-10 lists differ meaningfully
-  and the differences are explainable by the thesis contents.
+- [x] **2.5 Re-score on thesis switch + reorder check.** ✅ Cache reuse verified (re-POST
+  scores 0, reuses 43). **Tier gate:** both theses fully scored; the two top-10s share ZERO
+  companies — deeptech thesis: RightNow AI 92, Kopra Bio 89, Wardstone 89, Bucket Robotics
+  88, ... (all pre-seed/seed deeptech); consumer thesis: Partiful 93, Copilot Money 92,
+  Praktika AI 89, ... (all Series A consumer/fintech). Differences map directly to the
+  theses' stage + industries. Also verified on the Vercel preview deployment via
+  `/api/rankings?thesisId=...` for both theses.
 
 ### Tier 3 — Deal-flow map + report (the demo)
 Gate: the scripted demo (section 8, steps 1–2 and 4–5) works end to end on seed data.
