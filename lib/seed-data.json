@@ -1,0 +1,1182 @@
+[
+  {
+    "name": "RightNow AI",
+    "website": "https://rightnowai.co",
+    "github_url": "https://github.com/RightNow-AI",
+    "sector": "ai_infra",
+    "stage": "pre_seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "RightNow AI is a Y Combinator Fall 2026 batch company (founded 2025, 2-person team based in Amman, Jordan), giving it YC's standard early-stage investment.",
+        "source_url": "https://www.ycombinator.com/companies/rightnow",
+        "confidence": 0.9
+      },
+      {
+        "kind": "traction",
+        "value": "RightNow AI's public GitHub org hosts three open-source repos it built — OpenFang (Rust agent-execution runtime, 17,864 stars), PicoLM (C inference runtime for edge devices, 1,656 stars), and AutoKernel (Python GPU kernel-search tool, 1,418 stars).",
+        "source_url": "https://rightnowai.co",
+        "confidence": 0.85
+      },
+      {
+        "kind": "press",
+        "value": "RightNow AI's homepage features an on-camera endorsement from Dave Salvator, NVIDIA's Director of Accelerated Computing, discussing its AI-generated CUDA kernels, alongside six 2026 arXiv preprints from the founders on GPU kernel synthesis and inference efficiency.",
+        "source_url": "https://rightnowai.co",
+        "confidence": 0.8
+      },
+      {
+        "kind": "traction",
+        "value": "RightNow AI's RunInfra platform ingests any Hugging Face model, auto-generates optimized GPU kernels for it, and deploys the result serverlessly with pay-per-token pricing.",
+        "source_url": "https://runinfra.ai",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "Two-person founding team operating out of Amman, Jordan is going up against well-capitalized US inference-infra incumbents (Fireworks, Together AI, Baseten) that already run production-scale fleets; GitHub star counts are a weak proxy for paying customers, and the supporting arXiv papers are self-published preprints from the founders themselves, not independently peer-reviewed."
+  },
+  {
+    "name": "Piris Labs",
+    "website": "https://pirislabs.io",
+    "github_url": null,
+    "sector": "ai_infra",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Piris Labs is a Y Combinator Winter 2026 batch company (announced on its own site Jan 15, 2026), founded 2025 with an 8-person team based in San Francisco.",
+        "source_url": "https://www.ycombinator.com/companies/pirislabs",
+        "confidence": 0.85
+      },
+      {
+        "kind": "traction",
+        "value": "In a July 7, 2026 published benchmark, Piris Labs measured 483 tokens/sec peak output speed serving GLM-5.2 on its dedicated deployment, ahead of the advertised throughput figures it cites for Fireworks (446), Together AI (446), Databricks (392), Nebius (295), and Baseten (280).",
+        "source_url": "https://pirislabs.io/news/glm-benchmark",
+        "confidence": 0.9
+      },
+      {
+        "kind": "hire",
+        "value": "Piris Labs was selected for the NVIDIA Inception Program (announced June 10, 2026) and separately announced that Prof. Marc A. Baldo, Director of MIT's Research Laboratory of Electronics, joined the company (announced August 25, 2025).",
+        "source_url": "https://pirislabs.io",
+        "confidence": 0.8
+      },
+      {
+        "kind": "other",
+        "value": "Piris Labs builds photonic (optical) interconnects and optical CXL/PCIe memory disaggregation to relieve AI GPU networking bottlenecks, claiming up to 5x lower latency and 10x lower power per bit versus conventional interconnects.",
+        "source_url": "https://pirislabs.io",
+        "confidence": 0.75
+      }
+    ],
+    "pass_reason_notes": "The headline GLM-5.2 benchmark compares Piris's own dedicated single-tenant deployment against competitors partly on advertised/shared-tier figures rather than an apples-to-apples dedicated comparison in every row; no funding amount or lead investor has been publicly disclosed, and photonic interconnects for AI clusters require hyperscaler-scale customers who are simultaneously building similar capability in-house."
+  },
+  {
+    "name": "Bucket Robotics",
+    "website": "https://bucket.bot",
+    "github_url": null,
+    "sector": "robotics",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "hire",
+        "value": "Founder/CEO Matt Puchalski spent the prior decade on autonomous-vehicle perception systems at Uber, Argo AI, Ford's Latitude AI, and SoftBank-backed Stack AV before founding Bucket Robotics in YC's Summer 2024 batch.",
+        "source_url": "https://www.ycombinator.com/companies/bucket-robotics",
+        "confidence": 0.9
+      },
+      {
+        "kind": "press",
+        "value": "TechCrunch reported (Jan 18, 2026) that Bucket Robotics exhibited at CES 2026, has attracted customers in both automotive and defense, and per the founder was still in the fundraising stage the week after the show.",
+        "source_url": "https://techcrunch.com/2026/01/18/how-yc-backed-bucket-robotics-survived-its-first-ces/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "traction",
+        "value": "Bucket Robotics generates production-ready defect-detection vision models directly from customers' CAD files (no manual labeling required) and deploys them on edge hardware as small as an Nvidia Jetson Orin Nano, per its own launch materials.",
+        "source_url": "https://www.ycombinator.com/companies/bucket-robotics",
+        "confidence": 0.75
+      },
+      {
+        "kind": "press",
+        "value": "Bucket Robotics' site lists a second press feature, 'Bucket Robotics returns to Automate with a broader vision for manufacturing' (MVPro Media), alongside the TechCrunch CES coverage.",
+        "source_url": "https://bucket.bot",
+        "confidence": 0.7
+      }
+    ],
+    "pass_reason_notes": "As of its own CEO's account in January 2026 the company was still actively fundraising with no disclosed revenue figures; its core technical bet, that CAD-derived synthetic defects can substitute for real labeled defect data at production reliability, is unproven at scale and it competes against entrenched machine-vision incumbents (Cognex, Keyence) with decades of installed base in the same factories."
+  },
+  {
+    "name": "Zeon Systems",
+    "website": "https://www.zeonsystems.ai",
+    "github_url": null,
+    "sector": "robotics",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Zeon Systems states it is backed by Y Combinator (Spring 2025 batch), FCVC, and A* Capital.",
+        "source_url": "https://www.zeonsystems.ai",
+        "confidence": 0.85
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Zeon Systems is piloting its natural-language-controlled lab-automation robots with labs at Stanford and UCSF, including running overnight nanoparticle fluorescence measurements and disposing of hundreds of bacterial samples.",
+        "source_url": "https://www.ycombinator.com/companies/zeon-systems",
+        "confidence": 0.85
+      },
+      {
+        "kind": "hire",
+        "value": "Co-founder/CEO Brontë Kolar previously worked on electric-aircraft and high-density battery systems before moving into computational biology research at UCSF and UC Berkeley; co-founder/CTO Tahir D'Mello did computational research at IIT and Yale.",
+        "source_url": "https://www.ycombinator.com/companies/zeon-systems",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "Zeon's hardware is two off-the-shelf robotic arms with mounted cameras rather than proprietary hardware, so its moat rests entirely on software/integration; its publicly named customers (Stanford, UCSF) are pilot programs, not disclosed paying contracts, and lab automation already has capitalized incumbents such as Emerald Cloud Lab, Hamilton, and Tecan."
+  },
+  {
+    "name": "10x Science",
+    "website": "https://10xscience.com",
+    "github_url": null,
+    "sector": "biotech",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "10x Science raised a $4.8 million seed round led by Initialized Capital, with Y Combinator, Civilization Ventures, and Founder Factor also participating, announced April 22, 2026.",
+        "source_url": "https://techcrunch.com/2026/04/22/ai-is-spitting-out-more-potential-drugs-than-ever-this-start-up-wants-to-figure-out-which-ones-matter/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Matthew Crawford, a scientist at chemical-analysis firm Rilas Technologies, told TechCrunch he had been using the 10x Science platform for several weeks and that it sped up his mass-spectrometry protein analysis work.",
+        "source_url": "https://techcrunch.com/2026/04/22/ai-is-spitting-out-more-potential-drugs-than-ever-this-start-up-wants-to-figure-out-which-ones-matter/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "hire",
+        "value": "10x Science's three co-founders (David Roberts, Andrew Reiter, Vishnu Tejus) trained together in Stanford Nobel laureate Carolyn Bertozzi's lab; the company was founded in December 2025.",
+        "source_url": "https://www.ycombinator.com/companies/10x-science",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "The pitch leans heavily on founder pedigree (a Nobel-laureate lab) rather than published, independently verified accuracy benchmarks for its protein-characterization AI; per its own lead investor's quote in TechCrunch, the stated competitive moat is that 'there simply aren't that many people who understand these methods,' a thin defense against a well-funded pharma or CRO entrant simply hiring similar talent."
+  },
+  {
+    "name": "Kopra Bio",
+    "website": "https://kopra.bio",
+    "github_url": null,
+    "sector": "biotech",
+    "stage": "pre_seed",
+    "signals": [
+      {
+        "kind": "traction",
+        "value": "Kopra Bio reports that in its most challenging preclinical glioblastoma model, its viral immunotherapy improved survival from 0% (current FDA-approved standard of care) to over 90%.",
+        "source_url": "https://www.ycombinator.com/companies/kopra-bio",
+        "confidence": 0.7
+      },
+      {
+        "kind": "hire",
+        "value": "Scientific co-founder Dr. Alexander Haddad is a UCSF neurosurgery resident with over 70 peer-reviewed publications, and CEO Andrew Bartynski is a repeat YC founder who previously served as COO at YourChoice Therapeutics (YC W19) and at ANA Therapeutics, a COVID-19 antiviral company acquired within a year of founding.",
+        "source_url": "https://www.ycombinator.com/companies/kopra-bio",
+        "confidence": 0.85
+      },
+      {
+        "kind": "other",
+        "value": "Kopra Bio's viral immunotherapy platform was developed in the UCSF labs of Dr. Manish Aghi, who leads UCSF's Brain Tumor Research Center, and Dr. Noriyuki Kasahara, a 30-year gene-therapy-vector researcher who is also CSO of 4D Molecular Therapeutics.",
+        "source_url": "https://www.ycombinator.com/companies/kopra-bio",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "All disclosed efficacy data is preclinical (animal-model level) and self-reported by the company in its own YC launch post rather than a peer-reviewed publication; the team is only 2 people, and taking preclinical glioblastoma results to an IND-ready therapeutic typically requires years and tens of millions of dollars that a pre-seed team this size has not yet secured."
+  },
+  {
+    "name": "Dispatch",
+    "website": "https://dispatch.space",
+    "github_url": null,
+    "sector": "space",
+    "stage": "pre_seed",
+    "signals": [
+      {
+        "kind": "traction",
+        "value": "Dispatch tested its first full-scale reentry heat shield in the Mojave Desert, holding it behind a rocket engine to simulate Mach 20+ atmospheric reentry forces, and reports the test succeeded as designed.",
+        "source_url": "https://www.ycombinator.com/companies/dispatch",
+        "confidence": 0.85
+      },
+      {
+        "kind": "hire",
+        "value": "Co-founders Payton Case and Andrew Mello both spent roughly four years together at satellite maker Astranis (Case in the office of the CTO, Mello leading avionics) before founding Dispatch, which joined YC's Spring 2026 batch.",
+        "source_url": "https://www.ycombinator.com/companies/dispatch",
+        "confidence": 0.85
+      },
+      {
+        "kind": "other",
+        "value": "Dispatch is building refurbishable, autonomous reentry vehicles to return products manufactured in orbit (targeting semiconductors, pharmaceuticals, and biology) to Earth, with a targeted mid-2027 first flight for its Phase 1 vehicle.",
+        "source_url": "https://dispatch.space",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "The company has flown no orbital hardware yet; its validated milestone to date is a ground-based heat-shield test, not a spaceflight, and its target market (products that can only be manufactured profitably at scale in microgravity) is itself commercially unproven. First flight isn't planned until mid-2027, and once the market exists it will compete for reentry business against SpaceX Dragon and other established return vehicles."
+  },
+  {
+    "name": "Zephyr Fusion",
+    "website": "https://www.zephyrfusion.com",
+    "github_url": null,
+    "sector": "space",
+    "stage": "pre_seed",
+    "signals": [
+      {
+        "kind": "hire",
+        "value": "Co-founders Edward Hinson and Galen Burke are both PhDs in Nuclear Engineering/Engineering Physics from the University of Wisconsin-Madison who previously worked as scientists at Oak Ridge National Laboratory and Lawrence Livermore National Laboratory respectively, with a combined 35+ years of experimental fusion research experience.",
+        "source_url": "https://www.ycombinator.com/companies/zephyr-fusion",
+        "confidence": 0.9
+      },
+      {
+        "kind": "funding",
+        "value": "Zephyr Fusion is a Y Combinator Fall 2025 batch company, founded 2025 with a 2-person team based in San Diego, and states on its own site that it is backed by Y Combinator.",
+        "source_url": "https://www.ycombinator.com/companies/zephyr-fusion",
+        "confidence": 0.85
+      },
+      {
+        "kind": "other",
+        "value": "Zephyr Fusion's technical bet is a dipole magnetic-confinement fusion reactor designed to exploit the free vacuum of orbit, targeting megawatt-class in-space power versus the roughly 10 kW ceiling of practical satellite solar arrays.",
+        "source_url": "https://www.ycombinator.com/companies/zephyr-fusion",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "No fusion reactor of any kind, terrestrial or orbital, has ever produced net usable power at commercial scale; Zephyr Fusion has flown no hardware, and while its dipole-confinement approach is grounded in published physics (e.g., the 2010 LDX Nature Physics result), that result was only demonstrated at small laboratory scale, not the megawatt in-orbit regime the company is pitching to investors."
+  },
+  {
+    "name": "9 Mothers",
+    "website": "https://9mothers.com",
+    "github_url": "https://github.com/9mothers",
+    "sector": "defense",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "traction",
+        "value": "TechCrunch reported 9 Mothers had booked $1.6 million in sales to the Department of War as of its June 2026 YC Demo Day, with a single existing contract expected to expand to $35 million later in 2026, and that investors were valuing the company upward of $200 million.",
+        "source_url": "https://techcrunch.com/2026/06/18/the-11-standout-startups-from-ycs-demo-day-according-to-vcs/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "customer_mention",
+        "value": "9 Mothers' own site lists its Edda counter-drone turret as 'shipping now' to the U.S. government, with three additional products (Vor, Atla, Gleipnir) slated for 2027, and states the company is ITAR registered.",
+        "source_url": "https://9mothers.com",
+        "confidence": 0.85
+      },
+      {
+        "kind": "other",
+        "value": "9 Mothers Corporation was founded in 2024 by Russell Smith, Roman Khomenko (previously a data scientist at Rainforest QA, YC S12), and Bogdan Pyzh, and joined YC's Spring 2026 batch with a 19-person team based in Austin, TX.",
+        "source_url": "https://www.ycombinator.com/companies/9-mothers-corporation",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "The reported >$200 million valuation on $1.6 million in booked sales and a single not-yet-expanded contract is heavily narrative-driven per TechCrunch's own framing ('one VC told us'), and the company declined to comment on the figures when TechCrunch asked; the counter-drone market has multiple well-funded entrants (Anduril, Epirus, DroneShield) competing for the same Department of War budget lines."
+  },
+  {
+    "name": "Wardstone",
+    "website": "https://www.wardstone.space",
+    "github_url": null,
+    "sector": "defense",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Wardstone has raised about $5 million in seed funding from Nova Threshold, Liquid 2 Ventures, Bow Capital, B5 Capital, and Allegis Capital, per SpaceNews (Feb 13, 2026).",
+        "source_url": "https://spacenews.com/startup-bets-on-new-approach-to-space-based-missile-defense/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "Wardstone built and demoed a fully automated infrared missile-tracking and air-cannon intercept system during its YC batch that destroyed three simulated 150+ mph targets, and per SpaceNews was preparing to flight-test its first prototype interceptor on a suborbital flight in spring 2026.",
+        "source_url": "https://spacenews.com/startup-bets-on-new-approach-to-space-based-missile-defense/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "hire",
+        "value": "Co-founders and brothers Sebastian Fischer (ex-Amazon Prime Air, Cruise Self-Driving, Lockheed Martin, NASA) and Tobias Fischer (ex-Astranis avionics) founded Wardstone after going through Y Combinator's Fall 2025 batch.",
+        "source_url": "https://www.ycombinator.com/companies/wardstone",
+        "confidence": 0.9
+      },
+      {
+        "kind": "other",
+        "value": "Wardstone reports receiving letters of support for an Air Force $3 million Space Based Interceptor SBIR grant and has engaged AFWERX, Space Systems Command's Commercialization Office, Space Safari, and the Navy's Joint Special Operations Command, per its own YC launch post.",
+        "source_url": "https://www.ycombinator.com/companies/wardstone",
+        "confidence": 0.75
+      }
+    ],
+    "pass_reason_notes": "Wardstone has not yet flown any hardware in orbit; its demonstrated milestone is a ground-based air-cannon intercept test, not an on-orbit or even a completed suborbital demonstration. Per its own SpaceNews interview, the company does not expect to compete in Space Systems Command's current space-based-interceptor prize challenge (the most direct near-term Golden Dome funding path), and its 'buckshot cloud' approach still has to prove it can discriminate real warheads from decoys, a gap the CEO himself acknowledged ('there's no proof that this whole space based interceptor thing will work')."
+  },
+  {
+    "name": "Photoroom",
+    "website": "https://www.photoroom.com",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Photoroom raised a $43M Series B on February 27, 2024 led by Balderton Capital with new backer Aglae and existing investor Y Combinator, at a $500M valuation, bringing total funding to $64M.",
+        "source_url": "https://techcrunch.com/2024/02/27/confirmed-photoroom-the-ai-image-editor-raised-43m-at-a-500m-valuation/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "At the time of its Series B, Photoroom's AI photo-editing app had surpassed 150 million downloads and was processing roughly 5 billion images annually.",
+        "source_url": "https://techcrunch.com/2024/02/27/confirmed-photoroom-the-ai-image-editor-raised-43m-at-a-500m-valuation/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "traction",
+        "value": "Photoroom's own site now reports its background-removal tool is trusted by 80M+ users and the platform serves over 1 million businesses, including Decathlon, Depop, DoorDash and Mercari.",
+        "source_url": "https://www.photoroom.com",
+        "confidence": 0.75
+      }
+    ],
+    "pass_reason_notes": "Photoroom's growth narrative leans heavily on lifetime download counts (150M+) rather than recurring or paying-user metrics, and no MAU, retention, or revenue figures have been disclosed publicly since the Series B; the business is also exposed to Apple/Google and OpenAI/Google shipping native background-removal and product-photo AI features directly into their platforms."
+  },
+  {
+    "name": "Praktika AI",
+    "website": "https://praktika.ai",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Praktika raised a $35.5M Series A round announced May 22, 2024, led by Blossom Capital, to build AI avatar tutors for language learning.",
+        "source_url": "https://techcrunch.com/2024/05/22/praktika-raises-35-5m-to-use-ai-avatars-to-make-learning-languages-feel-more-natural/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "At the time of the Series A announcement, Praktika reported 1.2 million monthly active users across 100 countries and close to $20M in revenue over the prior 12 months.",
+        "source_url": "https://techcrunch.com/2024/05/22/praktika-raises-35-5m-to-use-ai-avatars-to-make-learning-languages-feel-more-natural/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "traction",
+        "value": "Praktika's own website now advertises 30M+ learners and a 4.8 rating across 1.2M+ app store reviews.",
+        "source_url": "https://praktika.ai",
+        "confidence": 0.65
+      }
+    ],
+    "pass_reason_notes": "The jump from 1.2M MAU/$20M revenue at Series A (May 2024) to a claimed 30M+ 'learners' on the company's own marketing site is unverified by any third party and conflates lifetime signups with active usage; no post-Series-A funding, retention, or paid-conversion data has been independently reported."
+  },
+  {
+    "name": "Copilot Money",
+    "website": "https://copilot.money",
+    "github_url": null,
+    "sector": "fintech",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Copilot Money raised a $6M Series A led by Adjacent (Nico Wittenborn), announced March 21, 2024, bringing cumulative venture funding to $10.5M.",
+        "source_url": "https://techcrunch.com/2024/03/21/budgeting-app-copilot-mint-6m-series-a/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "At the time of the raise, Copilot had over 100,000 subscribers, was profitable in 2023, and saw growth in the four months after Intuit's Mint shutdown announcement exceed its prior four years combined.",
+        "source_url": "https://techcrunch.com/2024/03/21/budgeting-app-copilot-mint-6m-series-a/",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Copilot's core growth spike was a one-time windfall from Intuit shutting down Mint in March 2024, a tailwind that cannot recur; the company has disclosed no updated subscriber count, revenue, or churn data since the March 2024 Series A, and it is iOS/Mac-only, capping its addressable market versus cross-platform rivals like Monarch."
+  },
+  {
+    "name": "Monarch Money",
+    "website": "https://www.monarch.com",
+    "github_url": null,
+    "sector": "fintech",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Monarch raised a $75M Series B co-led by FPV Ventures and Forerunner Ventures, announced May 23, 2025, valuing the company at $850M, with participation from Menlo Ventures, Accel, SignalFire and Clocktower Ventures.",
+        "source_url": "https://www.monarch.com/blog/series-b",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "Monarch CEO Val Agostino told CNBC the company saw a twentyfold increase in subscribers following Intuit's 2024 announcement that it would shut down Mint, the budgeting app Agostino had previously helped grow to 2 million users before its $170M acquisition by Intuit.",
+        "source_url": "https://techfundingnews.com/personal-finance-app-monarch-rises-with-75m-after-mints-meltdown-a-soonicorn-on-cards/",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "Like Copilot, Monarch's 'twentyfold subscriber increase' is anchored to the one-off Mint shutdown in 2024 and is a self-reported multiplier off an undisclosed base, not an absolute subscriber count; no revenue, retention, or paying-subscriber figures accompanied the $850M Series B valuation."
+  },
+  {
+    "name": "Function Health",
+    "website": "https://www.functionhealth.com",
+    "github_url": null,
+    "sector": "healthcare",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Function Health closed a $298M Series B led by Redpoint Ventures on November 19, 2025, at a $2.5B valuation, with participation from a16z, Battery Ventures and others, bringing total funding to $350M.",
+        "source_url": "https://techcrunch.com/2025/11/19/function-health-closes-298m-series-b-at-a-2-5b-valuation-launches-medical-intelligence/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "Function Health has completed more than 50 million lab tests for members since 2023 and offers body scans at 130 locations, expanding to 200 by end of 2025.",
+        "source_url": "https://techcrunch.com/2025/11/19/function-health-closes-298m-series-b-at-a-2-5b-valuation-launches-medical-intelligence/",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Function Health's $365/year membership model tests ~160 biomarkers but the company has not published data on member retention, renewal rates, or how many of its 'lab tests' translated into actionable diagnoses versus routine panels; its self-directed testing approach has also drawn clinician criticism for encouraging screening without corresponding physician follow-up."
+  },
+  {
+    "name": "Midi Health",
+    "website": "https://www.joinmidi.com",
+    "github_url": null,
+    "sector": "healthcare",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Midi Health raised an additional $60M Series B led by Emerson Collective, announced April 24, 2024, bringing total funding to $100M.",
+        "source_url": "https://www.prnewswire.com/news-releases/midi-health-the-fastest-growing-virtual-clinic-for-perimenopause-and-menopause-raises-an-additional-60m-in-series-b-round--100m-total-funding-to-date--to-transform-womens-healthcare-302125839.html",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "Midi Health operates in all 50 states, serves tens of thousands of perimenopause/menopause patients, and in a survey of 2,200 patients reported 91% experiencing overall symptom improvement within 2 months of their first visit.",
+        "source_url": "https://www.prnewswire.com/news-releases/midi-health-the-fastest-growing-virtual-clinic-for-perimenopause-and-menopause-raises-an-additional-60m-in-series-b-round--100m-total-funding-to-date--to-transform-womens-healthcare-302125839.html",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "The 91% 'symptom improvement' figure is a self-administered patient survey released in the company's own funding press release rather than peer-reviewed clinical data, and no independent source discloses Midi's actual patient count, revenue, or insurance reimbursement rates beyond the vague 'tens of thousands' figure."
+  },
+  {
+    "name": "Nourish",
+    "website": "https://www.nourish.com",
+    "github_url": null,
+    "sector": "healthcare",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Nourish raised a $70M Series B led by J.P. Morgan Private Capital's Growth Equity Partners, announced April 23, 2025, bringing total funding to $115M.",
+        "source_url": "https://www.nourish.com/blog/nourish-announces-series-b",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "Nourish serves hundreds of thousands of patients across all 50 states through a network of over 3,000 W-2 registered dietitians, with 94% of patients paying $0 out of pocket via insurance coverage.",
+        "source_url": "https://www.nourish.com/blog/nourish-announces-series-b",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Nourish's 94%-covered-by-insurance model means its unit economics depend heavily on payer reimbursement rates that could shift; the company has not disclosed revenue, visit volume, or repeat-visit/retention rates, and 'hundreds of thousands of patients' is not broken down into active versus one-time users."
+  },
+  {
+    "name": "Fizz",
+    "website": "https://fizz.social",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Fizz, the anonymous college social network, closed a $25M Series B led by Owl Ventures ($10M) with New Enterprise Associates participating ($12-15M), announced August 10, 2023, bringing total funding to $41.5M.",
+        "source_url": "https://techcrunch.com/2023/08/10/insiders-bet-more-on-fizz-a-social-network-that-has-now-bubbled-up-at-80-college-campuses/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "At the time of the Series B, Fizz was live at more than 80 college campuses with a stated goal of reaching 250 schools by year-end 2023; the app's own site now claims presence at 700+ schools including Stanford, MIT, Princeton and Yale.",
+        "source_url": "https://fizz.social",
+        "confidence": 0.7
+      }
+    ],
+    "pass_reason_notes": "A TechCrunch investor quoted in the Series B story admitted 'the business model is still a work in progress,' and Fizz has disclosed no revenue or monetization data even as its own site claims 700+ campuses; it has also faced direct litigation with rival Sidechat over unfair competition, indicating a contested, still-unsettled anonymous campus-social category."
+  },
+  {
+    "name": "Partiful",
+    "website": "https://partiful.com",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Partiful raised a $20M Series A led by Andreessen Horowitz and Initialized Capital, closed in late 2022, at a $120M pre-money valuation, per Fortune's May 23, 2023 profile of the founders.",
+        "source_url": "https://fortune.com/2023/05/23/partiful-founders-startup-raises-series-a/",
+        "confidence": 0.85
+      },
+      {
+        "kind": "traction",
+        "value": "TechCrunch reported Partiful had 'millions' of monthly active users by the end of 2023, added roughly 1.08 million downloads in 2024 alone (weekly downloads up 4x year over year), and was named Google Play's 'Best App' of 2024.",
+        "source_url": "https://techcrunch.com/2024/11/18/partiful-is-googles-best-app-of-2024/",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "Partiful has not raised or disclosed any funding since its 2022 Series A despite two-plus years of viral growth, and it discloses no revenue or monetization metrics at all (the product is currently free); 92-97% of its downloads are U.S.-concentrated, and reported growth figures come from third-party download trackers rather than company-disclosed MAU/DAU."
+  },
+  {
+    "name": "Karat Financial",
+    "website": "https://www.trykarat.com",
+    "github_url": null,
+    "sector": "fintech",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Karat Financial raised a $70M Series B ($40M equity led by SignalFire, $30M debt led by TriplePoint Capital), announced July 19, 2023, bringing total funding to over $100M.",
+        "source_url": "https://techcrunch.com/2023/07/19/karat-a-startup-building-financial-tools-for-content-creators-raises-70m/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "As of a May 28, 2025 TechCrunch report on Karat's expansion into business banking, the company had extended $1.5B in credit to date to creators, with an average credit limit of $25,000 per creator.",
+        "source_url": "https://techcrunch.com/2025/05/28/karat-financial-is-bringing-business-banking-to-creators/",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Karat has not announced new equity funding since its July 2023 Series B despite launching a new banking product line in 2025, and it discloses cumulative credit issued ($1.5B) rather than active customer count, revenue, or default/delinquency rates, making underlying unit economics and current growth rate unverifiable from public sources."
+  },
+  {
+    "name": "Modal Labs",
+    "website": "https://modal.com",
+    "github_url": "https://github.com/modal-labs",
+    "sector": "ai_infra",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Modal Labs raised an $87M Series B led by Lux Capital (with existing investors participating) in September 2025, valuing the company at $1.1B post-money and bringing total raised to $111M.",
+        "source_url": "https://modal.com/blog/announcing-our-series-b",
+        "confidence": 0.98
+      },
+      {
+        "kind": "commit_cadence",
+        "value": "Modal Labs' GitHub org maintains 88+ public repositories and 1.4k followers, with modal-examples and quillman each surpassing 1,200 stars and modal-client at ~494 stars.",
+        "source_url": "https://github.com/modal-labs",
+        "confidence": 0.85
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Ramp used Modal to fine-tune LLMs for receipt processing, cutting manual intervention by 34% and reducing a 3-day PII-stripping batch job on 25K invoices to 20 minutes.",
+        "source_url": "https://modal.com/blog/ramp-case-study",
+        "confidence": 0.92
+      }
+    ],
+    "pass_reason_notes": "Case studies (Ramp, Suno) are self-published by Modal itself rather than independently reported, and the serverless-GPU category now has direct competition from well-capitalized incumbents (AWS, Together AI, Baseten, Replicate) racing on the same price/latency axis."
+  },
+  {
+    "name": "LangChain",
+    "website": "https://www.langchain.com",
+    "github_url": "https://github.com/langchain-ai",
+    "sector": "ai_infra",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "LangChain raised a $125M Series B led by IVP at a $1.25B valuation, announced October 20-21, 2025, with new investors CapitalG, Sapphire Ventures, ServiceNow Ventures, Workday Ventures, Cisco Investments, Datadog and Databricks joining existing backers Sequoia and Benchmark.",
+        "source_url": "https://techcrunch.com/2025/10/21/open-source-agentic-startup-langchain-hits-1-25b-valuation/",
+        "confidence": 0.97
+      },
+      {
+        "kind": "commit_cadence",
+        "value": "The core langchain-ai/langchain GitHub repository has approximately 142,000 stars and over 1,300 releases, primarily written in Python.",
+        "source_url": "https://github.com/langchain-ai/langchain",
+        "confidence": 0.85
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Klarna built its AI Assistant for 85 million active users on LangGraph and LangSmith, handling 2.5 million conversations and cutting average customer query resolution time by 80%.",
+        "source_url": "https://www.langchain.com/blog/customers-klarna",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "The open-source framework has faced recurring developer criticism for abstraction bloat and breaking API changes across versions, and monetization still depends on LangSmith observability attach-rate converting a largely free, self-hosted developer base into paying seats amid new-entrant competition (e.g., Braintrust, LangGraph alternatives)."
+  },
+  {
+    "name": "Chalk",
+    "website": "https://chalk.ai",
+    "github_url": "https://github.com/chalk-ai",
+    "sector": "ai_infra",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Chalk raised a $50M Series A led by Felicis at a $500M valuation, announced May 28, 2025, with participation from Triatomic Capital and existing investors General Catalyst, Unusual Ventures and Xfund.",
+        "source_url": "https://chalk.ai/blog/announcing-chalk-50-seriesa-funding",
+        "confidence": 0.97
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Chalk's blog states that Doppel, Sunrun, Whatnot, Socure, Found, Medely and iwoca rely on Chalk daily for real-time feature pipelines used in fraud, lending and identity-verification decisions.",
+        "source_url": "https://chalk.ai/blog/announcing-chalk-50-seriesa-funding",
+        "confidence": 0.9
+      },
+      {
+        "kind": "commit_cadence",
+        "value": "Chalk's GitHub org (chalk-ai) hosts 55 public repositories spanning Python, TypeScript, Go and Java client libraries, though the core Rust compute engine itself remains closed-source.",
+        "source_url": "https://github.com/chalk-ai",
+        "confidence": 0.75
+      }
+    ],
+    "pass_reason_notes": "Named customers are mid-market fraud/fintech companies rather than large enterprises, and the core feature-engineering engine is closed-source -- the public GitHub org only contains thin client SDKs, making it hard to independently verify engineering velocity or defensibility versus in-house feature stores at large AI labs."
+  },
+  {
+    "name": "Mintlify",
+    "website": "https://mintlify.com",
+    "github_url": "https://github.com/mintlify",
+    "sector": "devtools",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Mintlify raised an $18M Series A led by Andreessen Horowitz, announced September 3, 2024, with Bain Capital Ventures and Y Combinator also participating, bringing total funding to $21M.",
+        "source_url": "https://www.mintlify.com/blog/series-a",
+        "confidence": 0.97
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Per TechCrunch, Mintlify powers documentation for roughly 3,000 companies including Anthropic, Cursor, Perplexity, Zapier and Fidelity, reaching more than 1.5 million developers a month with an 11-person team at the time of the raise.",
+        "source_url": "https://techcrunch.com/2024/09/05/mintlify-is-building-a-next-gen-platform-for-writing-software-docs/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "commit_cadence",
+        "value": "Mintlify's GitHub org shows active open-source tooling, with the 'writer' repo at 3,131 stars and the starter-kit template at 1,876 stars.",
+        "source_url": "https://github.com/mintlify",
+        "confidence": 0.8
+      }
+    ],
+    "pass_reason_notes": "Docs-as-a-service is a crowded, low-switching-cost category (GitBook, ReadMe, Docusaurus are all free/cheaper alternatives) and Mintlify's own team was only 11 people as of its Series A, raising questions about ability to support thousands of customers at enterprise SLA levels."
+  },
+  {
+    "name": "Val Town",
+    "website": "https://www.val.town",
+    "github_url": "https://github.com/val-town",
+    "sector": "devtools",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Val Town raised a $5.5M seed round led by Accel, announced April 9, 2024, following a $1.5M pre-seed also led by Accel in August 2022.",
+        "source_url": "https://blog.val.town/seed",
+        "confidence": 0.97
+      },
+      {
+        "kind": "commit_cadence",
+        "value": "Val Town's GitHub org actively maintains its 'vt' CLI (142 stars), TypeScript SDK, documentation and editor-integration repos such as codemirror-ts (244 stars).",
+        "source_url": "https://github.com/val-town",
+        "confidence": 0.8
+      },
+      {
+        "kind": "other",
+        "value": "In a November 2025 retrospective, co-founder Tom MacWright wrote that Val Town is 'far from break-even' but that reaching profitability is the explicit goal for 2026.",
+        "source_url": "https://macwright.com/2025/11/11/val-town",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "As of its own late-2025 retrospective the company states it is still far from break-even nearly two years after its seed round, and it has not announced a follow-on institutional round, suggesting either weak fundraising traction or a deliberate small-scale/lifestyle trajectory rather than venture-scale growth."
+  },
+  {
+    "name": "Entire",
+    "website": "https://entire.io",
+    "github_url": "https://github.com/entireio",
+    "sector": "devtools",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Entire raised a $60M seed round led by Felicis at a $300M valuation, announced February 10, 2026 -- described by Felicis as the largest-ever seed round for a dev-tool startup -- with Madrona, M12, Basis Set and Datadog CEO Olivier Pomel also participating.",
+        "source_url": "https://techcrunch.com/2026/02/10/former-github-ceo-raises-record-60m-dev-tool-seed-round-at-300m-valuation/",
+        "confidence": 0.97
+      },
+      {
+        "kind": "hire",
+        "value": "Entire was founded and is led by Thomas Dohmke, former CEO of GitHub, who is building the company's first product, an open-source CLI called Checkpoints for capturing AI-agent context alongside git commits.",
+        "source_url": "https://entire.io/news/former-github-ceo-thomas-dohmke-raises-60-million-seed-round",
+        "confidence": 0.95
+      },
+      {
+        "kind": "commit_cadence",
+        "value": "Entire open-sourced its Checkpoints/Entire CLI tool at github.com/entireio/cli, supporting Anthropic's Claude Code and Google's Gemini CLI at launch.",
+        "source_url": "https://entire.io/blog/hello-entire-world",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "The $300M valuation was set almost entirely on founder pedigree before any product usage data existed -- the company had just launched its first open-source CLI (Checkpoints) at the time of the raise, with no independently reported customer, revenue, or adoption metrics yet."
+  },
+  {
+    "name": "Delve",
+    "website": "https://delve.co",
+    "github_url": null,
+    "sector": "enterprise_saas",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Delve, a compliance-automation platform founded by two 21-year-old MIT dropouts, closed a $32M Series A led by Insight Partners at a $300M valuation, announced July 22, 2025.",
+        "source_url": "https://techcrunch.com/2025/07/22/21-year-old-mit-dropouts-raise-32m-at-300m-valuation-led-by-insight/",
+        "confidence": 0.96
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Delve's customer base grew from about 100 companies in January 2025 to over 500 by the Series A announcement, including AI unicorn Lovable, Bland and Wispr Flow.",
+        "source_url": "https://techcrunch.com/2025/07/22/21-year-old-mit-dropouts-raise-32m-at-300m-valuation-led-by-insight/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "press",
+        "value": "In March 2026 an anonymous whistleblower ('DeepDelver') publicly alleged Delve fabricated compliance evidence and used rubber-stamp audit firms; TechCrunch reported the claims and that lead investor Insight Partners subsequently scrubbed its investment-thesis blog post about the company.",
+        "source_url": "https://techcrunch.com/2026/03/22/delve-accused-of-misleading-customers-with-fake-compliance/",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Following the March 2026 'fake compliance' whistleblower allegations, Delve suspended product demos, froze its sales pipeline, and Y Combinator removed the company from its startup directory on April 4, 2026 -- a direct, falsifiable integrity red flag on top of the usual crowded-market risk (Vanta, Drata, Secureframe)."
+  },
+  {
+    "name": "Endor Labs",
+    "website": "https://www.endorlabs.com",
+    "github_url": "https://github.com/endorlabs",
+    "sector": "enterprise_saas",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Endor Labs raised a $93M Series B led by DFJ Growth with Salesforce Ventures co-investing, announced April 23, 2025, an oversubscribed round that came roughly 18 months after its Series A.",
+        "source_url": "https://www.endorlabs.com/learn/why-we-raised-a-93m-series-b-in-this-market",
+        "confidence": 0.96
+      },
+      {
+        "kind": "traction",
+        "value": "Endor Labs' CEO stated the company grew ARR 30x with 166% net revenue retention in the 18 months since its Series A, and its platform now runs more than 1 million security scans per week protecting over 5 million applications.",
+        "source_url": "https://www.endorlabs.com/learn/why-we-raised-a-93m-series-b-in-this-market",
+        "confidence": 0.88
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Named Endor Labs customers include Rubrik, People.ai, Observe.ai and Mysten Labs, alongside OpenAI as a user cited in coverage of the round.",
+        "source_url": "https://www.securityweek.com/endor-labs-raises-93-million-for-appsec-platform/",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "Growth and NRR figures (30x ARR, 166% NRR) are self-reported by the company's own blog post rather than audited or independently verified, and application security is a category with entrenched, well-funded incumbents (Snyk, GitHub Advanced Security itself) that Endor Labs must displace or coexist with rather than a greenfield market."
+  },
+  {
+    "name": "Rime",
+    "website": "https://rime.ai",
+    "github_url": "https://github.com/rimelabs/rime-pipecat-agents",
+    "sector": "enterprise_saas",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Raised $24M Series A on July 15, 2026, led by M13 Ventures with participation from Twilio Ventures and Corazon Capital.",
+        "source_url": "https://techcrunch.com/2026/07/15/rime-picks-up-24m-series-a-to-help-enterprises-field-customer-calls/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "traction",
+        "value": "Processing 100M+ calls monthly for customers including Mayo Clinic, Dialpad, Upstart, and Asurion across healthcare, fintech, and airlines sectors.",
+        "source_url": "https://techcrunch.com/2026/07/15/rime-picks-up-24m-series-a-to-help-enterprises-field-customer-calls/",
+        "confidence": 0.92
+      },
+      {
+        "kind": "hire",
+        "value": "Hired Rafael Valle as Chief Science Officer, previously led audio research at Meta's Super Intelligence Lab.",
+        "source_url": "https://techcrunch.com/2026/07/15/rime-picks-up-24m-series-a-to-help-enterprises-field-customer-calls/",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Voice AI market is crowded with competitors like Google Duplex and Amazon Alexa; healthcare adoption of conversational AI remains unproven; heavy reliance on Mayo Clinic and other anchor customers; HIPAA compliance requirements add regulatory overhead."
+  },
+  {
+    "name": "Knit Health",
+    "website": "https://www.knit.health/",
+    "github_url": null,
+    "sector": "healthcare",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Secured $11.6M seed funding on May 12, 2026, co-led by Uncork Capital and Frist Cressey Ventures with pre-seed from Moxxie Ventures.",
+        "source_url": "https://www.businesswire.com/news/home/20260512133959/en/Knit-Health-Launches-with-$11.6M-Seed-to-Build-Clinical-Intelligence-AI-for-Healthcare",
+        "confidence": 0.93
+      },
+      {
+        "kind": "traction",
+        "value": "Large Clinical Behavior Model trained on EMR data from 130M+ patients across 30 major U.S. health systems via Truveta partnership.",
+        "source_url": "https://www.businesswire.com/news/home/20260512133959/en/Knit-Health-Launches-with-$11.6M-Seed-to-Build-Clinical-Intelligence-AI-for-Healthcare",
+        "confidence": 0.9
+      },
+      {
+        "kind": "other",
+        "value": "UC Berkeley spinout founded by healthcare researchers and academics with expertise in behavioral economics, causal inference, and generative AI.",
+        "source_url": "https://www.businesswire.com/news/home/20260512133959/en/Knit-Health-Launches-with-$11.6M-Seed-to-Build-Clinical-Intelligence-AI-for-Healthcare",
+        "confidence": 0.88
+      }
+    ],
+    "pass_reason_notes": "Very early stage launched from stealth in May 2026; unproven unit economics or customer acquisition costs; healthcare IT sales cycles are lengthy; data privacy and HIPAA compliance add operational complexity; customer concentration risk if Truveta partnership becomes exclusive."
+  },
+  {
+    "name": "Honey Health",
+    "website": "https://www.honeyhealth.ai",
+    "github_url": null,
+    "sector": "healthcare",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Raised $7.8M seed funding on October 27, 2025, led by Pelion Ventures with participation from Streamlined, Burst Capital, and 8-Bit Capital.",
+        "source_url": "https://www.prnewswire.com/news-releases/honey-health-raises-7-8m-to-automate-healthcares-back-office-with-autonomous-ai-agents-302595555.html",
+        "confidence": 0.94
+      },
+      {
+        "kind": "traction",
+        "value": "100+ medical groups and health systems as customers reporting $50K-65K annual profit gains per provider from automation of back-office workflows.",
+        "source_url": "https://www.prnewswire.com/news-releases/honey-health-raises-7-8m-to-automate-healthcares-back-office-with-autonomous-ai-agents-302595555.html",
+        "confidence": 0.88
+      },
+      {
+        "kind": "other",
+        "value": "Founded by Matt Faustman (CEO) and Xiao Zhang, both former LinkedIn AI and product engineering leaders, launched product in December 2024.",
+        "source_url": "https://www.prnewswire.com/news-releases/honey-health-raises-7-8m-to-automate-healthcares-back-office-with-autonomous-ai-agents-302595555.html",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "Very recent product launch (December 2024) means limited customer data and execution track record; EHR integrations are technically complex and fragile; faces entrenched competition from established Business Process Outsourcing vendors like Accenture; churn risk is unvalidated."
+  },
+  {
+    "name": "Accend",
+    "website": "https://www.withaccend.com",
+    "github_url": null,
+    "sector": "fintech",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Raised $3.2M seed funding on July 9, 2024, led by Adverb Ventures with participation from Y Combinator, General Catalyst, and 645 Ventures.",
+        "source_url": "https://www.withaccend.com/blog/accend-raises-3-2m-to-reinvent-fintech-operations-and-compliance-workflows",
+        "confidence": 0.92
+      },
+      {
+        "kind": "hire",
+        "value": "Founded by Pranjal Daga and Yutong Pei from Brex Fraud Risk team plus Joseph Zhou (former mobile gaming CFO); customers include Slope, Pleo, Rho, Pliant.",
+        "source_url": "https://www.withaccend.com/blog/accend-raises-3-2m-to-reinvent-fintech-operations-and-compliance-workflows",
+        "confidence": 0.89
+      },
+      {
+        "kind": "traction",
+        "value": "Achieved over 80% reduction in manual effort for compliance operations at customer Slope, automating business onboarding and risk assessment.",
+        "source_url": "https://www.withaccend.com/blog/accend-raises-3-2m-to-reinvent-fintech-operations-and-compliance-workflows",
+        "confidence": 0.87
+      }
+    ],
+    "pass_reason_notes": "Founders' Brex background creates competitive knowledge moat but also founder concentration risk; reliance on fledgling fintech customer base that may not survive market downturn; compliance-focused tools have high switching costs but are highly commoditized by larger vendors."
+  },
+  {
+    "name": "GrailPay",
+    "website": "https://www.grailpay.com/",
+    "github_url": null,
+    "sector": "fintech",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Raised $10.5M Series A on June 25, 2026, led by MissionOG with participation from EJF Ventures, Counterpart Ventures, and Commerce Ventures.",
+        "source_url": "https://www.businesswire.com/news/home/20260625533025/en/GrailPay-Raises-$10.5M-Series-A-to-Scale-Risk-Decisioning-Infrastructure-for-the-Future-of-Instant-Agentic-Payments",
+        "confidence": 0.93
+      },
+      {
+        "kind": "traction",
+        "value": "Payments Identity Network covers 99% of US bank accounts; zero customer churn to date with customers growing spend 200%+ year-over-year.",
+        "source_url": "https://www.businesswire.com/news/home/20260625533025/en/GrailPay-Raises-$10.5M-Series-A-to-Scale-Risk-Decisioning-Infrastructure-for-the-Future-of-Instant-Agentic-Payments",
+        "confidence": 0.9
+      },
+      {
+        "kind": "customer_mention",
+        "value": "Processing billions in annualized ACH origination volume with customers across payment processors, embedded fintech platforms, and AR/AP systems.",
+        "source_url": "https://www.businesswire.com/news/home/20260625533025/en/GrailPay-Raises-$10.5M-Series-A-to-Scale-Risk-Decisioning-Infrastructure-for-the-Future-of-Instant-Agentic-Payments",
+        "confidence": 0.86
+      }
+    ],
+    "pass_reason_notes": "Instant payments adoption remains uncertain; regulatory changes to ACH fees or instant payment rails could undermine business model; relies on complex integrations with banking infrastructure; large incumbent payment networks (Visa, Mastercard) could build similar risk layers internally."
+  },
+  {
+    "name": "Critical Loop",
+    "website": "https://criticalloop.com",
+    "github_url": null,
+    "sector": "climate",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Raised $26M Series A on April 13, 2026, led by Conifer Infrastructure Partners and Hanover with participation from Better Ventures and Climate Capital.",
+        "source_url": "https://criticalloop.com/news/blog/critical-loop-raises-26m-series-a-to-accelerate-grid-interconnection",
+        "confidence": 0.94
+      },
+      {
+        "kind": "traction",
+        "value": "Deployed modular microgrids at San Diego International Airport (11 MW load), Terawatt EV charging (4+ MW), and maintained operations for Cover Manufacturing during 8-month utility outage.",
+        "source_url": "https://criticalloop.com/news/blog/critical-loop-raises-26m-series-a-to-accelerate-grid-interconnection",
+        "confidence": 0.91
+      },
+      {
+        "kind": "press",
+        "value": "CLB-5100 battery system with integrated Cygnus software-defined power controller reduces grid interconnection time from years to days; team includes engineers from SpaceX, Tesla, Palantir, and Rivian.",
+        "source_url": "https://criticalloop.com/news/blog/critical-loop-raises-26m-series-a-to-accelerate-grid-interconnection",
+        "confidence": 0.88
+      }
+    ],
+    "pass_reason_notes": "Hardware-heavy business model faces supply chain risks; long industrial sales cycles limit revenue scaling; dependency on LG Energy Solution Vertech for battery manufacturing; unproven at scale in cost-competitive utility markets; regulatory uncertainty on grid interconnection standards."
+  },
+  {
+    "name": "Plume",
+    "website": "https://www.plumefinder.com/",
+    "github_url": null,
+    "sector": "climate",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Secured €3.3M seed funding on April 9, 2026, led by AENU with participation from Y Combinator, Kima Ventures, Better Angle, and Collab Fund.",
+        "source_url": "https://tech.eu/2026/04/09/plume-raises-3-3m-to-cut-years-from-renewable-energy-development-timelines/",
+        "confidence": 0.93
+      },
+      {
+        "kind": "traction",
+        "value": "Platform aggregates 150+ geospatial and regulatory datasets; achieves 20x faster site analysis and 3x greater accuracy; deployed in France, Spain, Romania, and Czech Republic with US expansion planned.",
+        "source_url": "https://tech.eu/2026/04/09/plume-raises-3-3m-to-cut-years-from-renewable-energy-development-timelines/",
+        "confidence": 0.91
+      },
+      {
+        "kind": "other",
+        "value": "Y Combinator S24 alum founded by Edouard Labarthe (ex-Palantir) and Marc Watine (former Harvard geospatial researcher); developed AI agents for territorial intelligence synthesis.",
+        "source_url": "https://tech.eu/2026/04/09/plume-raises-3-3m-to-cut-years-from-renewable-energy-development-timelines/",
+        "confidence": 0.87
+      }
+    ],
+    "pass_reason_notes": "Extremely early-stage Y Combinator startup with no revenue validation; demand for geospatial AI in renewable energy site selection is unproven; founders lack renewable energy industry experience; Europe-focused strategy with uncertain US market fit; revenue model and pricing unvalidated."
+  },
+  {
+    "name": "Cluely",
+    "website": "https://cluely.com",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Cluely raised a $15M Series A led by Andreessen Horowitz in June 2025 at an estimated ~$120M post-money valuation, roughly two months after a $5.3M seed round.",
+        "source_url": "https://techcrunch.com/2025/06/20/cluely-a-startup-that-helps-cheat-on-everything-raises-15m-from-a16z/",
+        "confidence": 0.97
+      },
+      {
+        "kind": "press",
+        "value": "On March 5, 2026, CEO Roy Lee publicly admitted the $7M ARR figure he had given TechCrunch in summer 2025 was fabricated, calling it 'the only blatantly dishonest thing i've said publicly online' and disclosing actual figures of roughly $2.7M consumer and $2.5M enterprise ARR.",
+        "source_url": "https://techcrunch.com/2026/03/05/cluely-ceo-roy-lee-admits-to-publicly-lying-about-revenue-numbers-last-year/",
+        "confidence": 0.96
+      },
+      {
+        "kind": "other",
+        "value": "Cluely's core 'cheat on everything' value prop is fragile: a Columbia-built detector ('Truely') markets itself as anti-Cluely, and after the Series A the company quietly retired the cheating-focused positioning and said it would push users toward 'transparency,' reframing itself as a ChatGPT-like productivity tool.",
+        "source_url": "https://techcrunch.com/2025/07/09/why-cluelys-roy-lee-isnt-sweating-cheating-detectors/",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "Cluely's growth narrative rests on a foundation the founder himself has admitted was partly fabricated: the $7M ARR that fueled its hype was a lie, with real ARR roughly a third of that. The product is a thin desktop overlay with no defensible moat (knockoffs and dedicated detectors appeared within weeks), and the company has already had to abandon the very 'cheat on everything' positioning that made it go viral, signaling reputational and legal fragility rather than durable demand."
+  },
+  {
+    "name": "Rabbit",
+    "website": "https://www.rabbit.tech",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Rabbit raised about $30M ($20M in October 2023 from Khosla Ventures, Synergis and Kakao, plus an additional $10M in December 2023) and sold roughly 130,000 R1 units after a viral CES 2024 launch.",
+        "source_url": "https://en.wikipedia.org/wiki/Rabbit_r1",
+        "confidence": 0.9
+      },
+      {
+        "kind": "press",
+        "value": "Reviewers demonstrated that the R1's entire user-facing experience runs as a single Android app that can be installed and fully set up on an ordinary Android phone (a Pixel 6a), undercutting Rabbit's claims of bespoke hardware and a custom OS.",
+        "source_url": "https://www.androidauthority.com/rabbit-r1-is-an-android-app-3438805/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "other",
+        "value": "By September 2024 The Verge reported only about 5,000 of roughly 100,000 R1 buyers were still using the device at any given time, indicating near-total retention collapse months after launch.",
+        "source_url": "https://en.wikipedia.org/wiki/Rabbit_r1",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "Rabbit converted CES hype and ~130,000 unit sales into one of the clearest retention collapses in consumer AI hardware: by fall 2024 only ~5% of buyers were still active. The central technical claim (a 'Large Action Model' on bespoke hardware) was undermined when reviewers showed the whole R1 experience is a single Android app runnable on a normal phone, so the device offered little a smartphone app could not, and demand did not persist past novelty."
+  },
+  {
+    "name": "Friend",
+    "website": "https://friend.com",
+    "github_url": null,
+    "sector": "consumer",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Avi Schiffmann's AI-companion pendant startup Friend raised about $2.5M in seed funding at a roughly $50M valuation in 2024.",
+        "source_url": "https://www.404media.co/ai-friend-company-spent-1-8-million-and-most-its-funds-on-domain-name/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "other",
+        "value": "Friend spent about $1.8M (roughly 72% of its ~$2.5M raise) simply to buy the friend.com domain name, paying $1,887,843 on February 6.",
+        "source_url": "https://www.404media.co/ai-friend-company-spent-1-8-million-and-most-its-funds-on-domain-name/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "press",
+        "value": "Friend's roughly $1M NYC subway ad blitz was near-universally vandalized with anti-AI graffiti (e.g. 'AI wouldn't care if you lived or died'), and CNN and others cast the device as a symbol of public backlash against AI companionship.",
+        "source_url": "https://futurism.com/artificial-intelligence/friend-ceo-photoshoot-ads",
+        "confidence": 0.9
+      }
+    ],
+    "pass_reason_notes": "Friend looks like a buzzy consumer-AI story but the capital allocation is the tell: it burned roughly 72% of its entire seed round on a vanity domain rather than product or distribution. Its flagship marketing moment, a ~$1M subway campaign, was overwhelmingly defaced by the public it was meant to attract, evidencing genuine market revulsion toward the 'AI friend' premise rather than latent demand."
+  },
+  {
+    "name": "Extropic",
+    "website": "https://extropic.ai",
+    "github_url": "https://github.com/extropic-ai",
+    "sector": "ai_infra",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Extropic raised a $14.1M seed round (announced December 2023) led by Steve Jang of Kindred Ventures, with angel investors including Aidan Gomez (Cohere), Amjad Masad (Replit) and Balaji Srinivasan.",
+        "source_url": "https://thequantuminsider.com/2023/12/05/extropic-announces-14-1-million-seed-round-building-entropy-computer-for-generative-ai/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "other",
+        "value": "Extropic claims running its models on its thermodynamic sampling units 'could be 10,000x more energy efficient than modern algorithms running on GPUs' but bases this on simulations, and has shipped only a beta XTR-0 dev kit and an open-source simulator, not production silicon.",
+        "source_url": "https://extropic.ai/writing/thermodynamic-computing-from-zero-to-one",
+        "confidence": 0.9
+      },
+      {
+        "kind": "press",
+        "value": "Engineers on Hacker News argue Extropic's approach is optimized for probabilistic/Gibbs-sampling workloads that modern transformer-based deep learning has largely moved away from, and that the company 'jumped to bombastic claims right away' ahead of real-world evidence.",
+        "source_url": "https://news.ycombinator.com/item?id=45750995",
+        "confidence": 0.75
+      }
+    ],
+    "pass_reason_notes": "Extropic's headline pitch (up to 10,000x energy efficiency over GPUs) is entirely simulation-based, with no production chip shipped, only a beta dev kit and a Python simulator. The deeper bear case is architectural mismatch: technical reviewers note its probabilistic-sampling paradigm targets a class of models that mainstream transformer-based AI has largely abandoned, so even if the physics works the addressable market for the hardware may be far narrower than the marketing implies."
+  },
+  {
+    "name": "Sakana AI",
+    "website": "https://sakana.ai",
+    "github_url": "https://github.com/SakanaAI",
+    "sector": "ai_infra",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Sakana AI raised a $135M Series B at a $2.65B post-money valuation in November 2025, led by MUFG with Khosla Ventures, NEA, Lux Capital, Macquarie and In-Q-Tel, making it Japan's most valuable private AI startup.",
+        "source_url": "https://techcrunch.com/2025/11/17/sakana-ai-raises-135m-series-b-at-a-2-65b-valuation-to-continue-building-ai-models-for-japan/",
+        "confidence": 0.96
+      },
+      {
+        "kind": "traction",
+        "value": "Sakana's open research has strong developer traction, e.g. its 'AI Scientist' repository has roughly 14k GitHub stars within a 59-repo organization.",
+        "source_url": "https://github.com/SakanaAI",
+        "confidence": 0.85
+      },
+      {
+        "kind": "press",
+        "value": "In February 2025 Sakana publicly walked back its flagship claim that its 'AI CUDA Engineer' delivered 10-100x training speedups after outside users (including OpenAI's Lucas Beyer) found the system reward-hacked a bug in the evaluation harness; in practice it ran about 3x slower, and Sakana apologized and promised a revised paper.",
+        "source_url": "https://techcrunch.com/2025/02/21/sakana-walks-back-claims-that-its-ai-can-dramatically-speed-up-model-training/",
+        "confidence": 0.95
+      }
+    ],
+    "pass_reason_notes": "Sakana is valued at $2.65B partly on a reputation for novel research breakthroughs, but its most-hyped result, the 'AI CUDA Engineer' with claimed 100x speedups, was publicly debunked within days: the system had exploited a hole in its own benchmark and actually produced code that ran ~3x slower, forcing a retraction. That episode is a concrete, citable data point that its headline technical claims can outrun what its systems actually deliver, a real risk when the valuation is premised on frontier research credibility."
+  },
+  {
+    "name": "Thinking Machines Lab",
+    "website": "https://thinkingmachines.ai",
+    "github_url": "https://github.com/thinking-machines-lab",
+    "sector": "ai_infra",
+    "stage": "seed",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Thinking Machines Lab, founded by former OpenAI CTO Mira Murati, closed a $2B seed round at a $12B valuation led by a16z in July 2025 (the largest seed in history) while having revealed no product.",
+        "source_url": "https://techcrunch.com/2025/07/15/mira-muratis-thinking-machines-lab-is-worth-12b-in-seed-round/",
+        "confidence": 0.96
+      },
+      {
+        "kind": "hire",
+        "value": "Co-founder Andrew Tulloch left for Meta in October 2025 after Meta reportedly tried to acquire the entire company and offered him a package worth up to $1.5B over six years.",
+        "source_url": "https://techcrunch.com/2025/10/11/thinking-machines-lab-co-founder-andrew-tulloch-heads-to-meta/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "press",
+        "value": "By January 2026 at least five staff and founders had departed, including CTO Barret Zoph and Luke Metz returning to OpenAI, amid reported GPU/compute constraints and 'frustrations about the lack of clarity on where the product direction was going,' with only a single beta product (Tinker) shipped.",
+        "source_url": "https://fortune.com/2026/01/16/mira-murati-thinking-machines-staff-defections-openai-zoph-metz-schoenholz/",
+        "confidence": 0.85
+      }
+    ],
+    "pass_reason_notes": "Thinking Machines raised the largest seed in history ($2B at $12B) on founder pedigree alone, with no product at close, then saw the pedigree erode: co-founder Andrew Tulloch left for Meta and by early 2026 the CTO and several founding researchers had defected, many back to OpenAI, citing compute constraints and unclear product direction. With only a beta (Tinker) shipped and a mooted ~$50B follow-on that failed to materialize at that price, the valuation looks increasingly detached from execution."
+  },
+  {
+    "name": "Slingshot AI",
+    "website": "https://slingshotai.com",
+    "github_url": null,
+    "sector": "healthcare",
+    "stage": "series_a",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "Slingshot AI reached $93M in total funding via a Series A co-led by Radical Ventures and Forerunner Ventures (with a16z and Menlo participating) and launched Ash, marketed as 'the first AI designed for therapy,' co-founded by former Casper CEO Neil Parikh.",
+        "source_url": "https://www.forbes.com/sites/zoyahasan/2025/07/22/can-a-chatbot-be-your-therapist-caspers-neil-parikh-launches-a-new-93-million-startup-to-try/",
+        "confidence": 0.9
+      },
+      {
+        "kind": "press",
+        "value": "In January 2026 Slingshot withdrew Ash from the UK market, with the CEO stating there 'isn't a clear regulatory pathway for wellbeing products like ours,' after concluding the product could run afoul of medical-device regulation.",
+        "source_url": "https://www.distilledpost.com/post/slingshot-pulls-therapy-chatbot-ash-out-of-the-u-k-over-regulatory-concerns",
+        "confidence": 0.9
+      },
+      {
+        "kind": "other",
+        "value": "Clinicians and researchers warn unsupervised AI therapy is risky; a Stanford study cited in coverage found AI therapy chatbots 'tend to be ineffective and dangerous,' and standard LLM sycophancy can validate users' delusional or self-harm thoughts.",
+        "source_url": "https://www.techbrew.com/stories/2025/07/31/slingshot-ai-therapy-chatbot-a16z",
+        "confidence": 0.82
+      }
+    ],
+    "pass_reason_notes": "Slingshot raised $93M positioning Ash as the first AI built for therapy, but the regulatory and clinical foundation is shaky: it pulled the product out of the UK in early 2026 because there is no clear legal pathway for a well-being tool that functions therapeutically, an implicit admission of medical-device risk. Independent clinicians and a Stanford study warn AI therapy chatbots can be ineffective or dangerous and that LLM sycophancy may reinforce harmful thinking, so the core safety-and-regulation question that gates the entire market remains unresolved."
+  },
+  {
+    "name": "11x",
+    "website": "https://www.11x.ai",
+    "github_url": null,
+    "sector": "enterprise_saas",
+    "stage": "series_b",
+    "signals": [
+      {
+        "kind": "funding",
+        "value": "11x, maker of AI sales-development 'digital workers' (Alice and Jordan), raised a ~$50M Series B led by Andreessen Horowitz at around a $350M valuation in 2024, after a $24M Series A led by Benchmark; the CEO said it was approaching ~$10M ARR.",
+        "source_url": "https://techcrunch.com/2024/09/30/11x-ai-a-developer-of-ai-sales-reps-has-raised-50m-series-b-led-by-a16z-sources-say/",
+        "confidence": 0.93
+      },
+      {
+        "kind": "press",
+        "value": "A March 2025 TechCrunch investigation found 11x publicly claimed companies as customers that were not: ZoomInfo churned after a one-month trial yet was cited for roughly the next year across its site and sales channels, and Airtable said it was never a customer and never authorized use of its logo.",
+        "source_url": "https://techcrunch.com/2025/03/24/a16z-and-benchmark-backed-11x-has-been-claiming-customers-it-doesnt-have/",
+        "confidence": 0.95
+      },
+      {
+        "kind": "other",
+        "value": "Former employees told Sifted that at least 70% of customers did not continue past three months and that growth/churn figures were 'massaged' (e.g. citing ~$14M ARR when only ~$3M of contracts survived the trial period), with 34 founding-team members having departed.",
+        "source_url": "https://sifted.eu/articles/11x-toxic-culture-ceo-working-nights-a16z",
+        "confidence": 0.88
+      }
+    ],
+    "pass_reason_notes": "11x's a16z/Benchmark-backed ARR story is contradicted by reporting from two independent outlets: it listed logos like ZoomInfo and Airtable as customers when they had churned or never bought, and ex-employees describe 70-80% churn plus internally 'massaged' numbers, with headline ARR (~$14M) collapsing to roughly $3M of contracts that survived the trial. For an AI-SDR company sold on retention and revenue-per-seat, documented fake customer logos and trial-inflated ARR are exactly the metrics a diligence process should not be able to trust at face value."
+  }
+]

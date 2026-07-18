@@ -43,12 +43,15 @@ export default function Home() {
       </p>
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Link href="/dev" className={cn(buttonVariants({ size: "lg" }))}>
-          Open the dev console
+        <Link href="/onboarding" className={cn(buttonVariants({ size: "lg" }))}>
+          Describe your thesis
         </Link>
-        <Badge variant="outline" className="ml-1">
-          Tier 0 · skeleton
-        </Badge>
+        <Link
+          href="/dev"
+          className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+        >
+          Dev console
+        </Link>
       </div>
 
       <div className="mt-14 grid gap-4 sm:grid-cols-3">
