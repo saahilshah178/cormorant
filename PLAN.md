@@ -535,41 +535,107 @@ green; map renders and node-click drill-down works on the deployed URL
 Gate: a discovery run adds ≥1 new scored node in the background — verified by starting a run,
 closing the tab, and finding the new node on reload.
 
-- [ ] **4.1 Discovery data model.** Migration adding `discovery_runs` and
-  `discovery_instructions` (section 3).
-  **Done:** tables exist; a hand-inserted `discovery_instructions` row is readable.
-- [ ] **4.2 Source integrations.** One fetch+parse function per fixed source (YC directory,
-  Product Hunt, HN Show/Launches, GitHub trending, Wellfound) returning raw candidate mentions
-  (name, snippet, source_url). One search-API function (Exa or Tavily) taking a query string
-  and returning the same shape, for the broaden-the-net pass.
-  **Done:** each source function returns ≥1 real candidate when run standalone.
-- [ ] **4.3 Discovery workflow (Workflow DevKit).** A `"use workflow"` orchestrator wiring:
-  parallel scraper-agent steps (one per fixed source + the search-API step, each reading the
-  active thesis + active `discovery_instructions` as context) → parallel review-agent steps
-  (dedupe against existing `companies` by name/domain, verify the source_url actually supports
-  the claim, extract structured `signals` with the cheap model, reject anything without a
-  citable URL) → a grading-agent step that calls the same `scoreCompany` from Tier 2, unchanged
-  → an insert step (company + signals + score, tagged `source='discovery:<name>'`) that
-  increments `discovery_runs.companies_found`. Loop control: batch mode stops at
-  `target_count`; continuous mode loops with a `sleep()` between rounds and a `createHook()`
-  stop signal checked each round. Every step is isolated — one candidate or source erroring
-  never drops data already inserted.
-  **Done:** `start()`ing the workflow inserts ≥1 new company with signals and a score, in both
-  batch and continuous mode; resuming the stop hook ends a continuous run cleanly.
-  **Verify:** kill the network mid-run — nothing already inserted is lost or duplicated on
-  retry.
-- [ ] **4.4 Discovery settings UI.** A settings panel: mode toggle (batch with a target-count
-  input, default 5–10, vs continuous), start/stop controls (`start()` / stop-hook resume), a
-  free-text instructions box that upserts into `discovery_instructions` and visibly steers the
-  next run, and a live agent-activity log reading the namespaced streams (`logs:scraper` /
-  `logs:review` / `logs:grading`).
-  **Done:** starting a batch run from the UI, closing the tab, and reopening the app later
-  shows the completed run's new companies already on the map.
-- [ ] **4.5 Map integration.** Discovered companies render on the map/board exactly like seed
-  companies (same data layer, no special-casing) and drop in live while a run is active and
-  the panel is open.
-  **Done (tier gate):** demo step 3 works on camera — a run kicked off live adds a node that
-  visibly settles into position by fit score.
+**Status — TIER 4 COMPLETE ✅ (2026-07-18, gate verified locally end-to-end in a headless
+browser). Uncommitted on `saahil` — review the diff, then commit.** `npm run build` and
+`npm run lint` are green. Built as a real Workflow DevKit durable pipeline (`workflow` +
+`@workflow/next`), not a request-bound job.
+
+Implementation notes:
+- Deps added: `workflow@4` + `@workflow/next@4` (per §2). NOT `@workflow/ai` — its
+  `DurableAgent` peers on `ai@^6` and this repo is on `ai@7`, so the scraper/review/grading
+  "agents" are plain `generateText` calls inside `"use step"` functions (same durability, full
+  Node access, no sandbox `fetch` shim needed). This is a deliberate deviation from §2's
+  "`@workflow/ai` + `DurableAgent`" line, forced by the ai-major mismatch — flagged, not silent.
+- `next.config.ts` wrapped with `withWorkflow(...)` (enables the `"use workflow"`/`"use step"`
+  directives; generates the `/.well-known/workflow/v1/*` routes). `proxy.ts` matcher now
+  excludes `\.well-known/workflow/` — without this the proxy intercepts WDK's internal step
+  requests and breaks execution/resumption (the §2 gotcha, in the wild).
+- `lib/discovery/sources.ts` (4.2) — one fetch+parse function per source returning a uniform
+  `{name, snippet, source_url, source, website}`. All keyless endpoints verified live:
+  YC via the **yc-oss** static mirror (`batches/<slug>.json`, two most-recent batches), HN
+  Show HN via the **Algolia** API, Product Hunt via its public **Atom feed** (regex parse, no
+  XML dep), GitHub via the keyless **search API** (recently-created repos by stars). Wellfound
+  is DataDome bot-walled from every network tried (403 challenge on all paths incl.
+  sitemap.xml) — the function is implemented and parses normally if it ever unblocks, but
+  degrades to `[]` with a warning instead of failing the round. Search (broaden-the-net) uses
+  **Exa or Tavily** when `EXA_API_KEY`/`TAVILY_API_KEY` is set, else a **keyless HN full-text
+  search** fallback so the pass still runs with zero extra signups (documented deviation from
+  §2's "Exa or Tavily" — no key was provisioned; drop one in for wider reach).
+- `lib/discovery/pipeline.ts` (4.3) — the `discoveryWorkflow` orchestrator. Per round:
+  parallel `scrapeSource` steps (5 fixed sources + search, each reading the thesis + active
+  `discovery_instructions`; the cheap model triages raw mentions down to the few worth
+  reviewing) → parallel `reviewCandidate` steps (dedupe by normalized name/domain against
+  existing `companies`, **fetch the source_url and reject if it 4xx/5xx or doesn't mention the
+  company** — the citation is verified, not assumed; extract ≤4 structured signals with the
+  cheap model, grounded only in the fetched page text; reject anything with no citable signal)
+  → `insertAndGrade` (insert company + signals, then the SAME Tier-2 `scoreCompany` unchanged,
+  persist the score, bump `discovery_runs.companies_found`; a scoring failure **rolls the
+  company back** so the map never shows an unscored ghost node). Loop control: batch stops at
+  `target_count` (or after 3 rounds when the small candidate pool drains); continuous
+  `Promise.race`s a `sleep("60s")` against a `createHook("discovery-stop-<runId>")` each round.
+  Every step catches its own errors and returns empty/null, so one candidate/source failing
+  never drops inserted data.
+- API routes: `app/api/discovery/{start,stop,status,stream,instructions}/route.ts`.
+  `start` inserts the `discovery_runs` row, `start()`s the workflow, records `workflow_run_id`
+  (reattach after reload). `stop` flips DB status AND `resumeHook(..., {stop:true})`. `stream`
+  proxies `run.getReadable({namespace})` for the per-agent logs. `instructions` GET/POST/DELETE
+  (DELETE = soft `active=false`).
+- `components/discovery-panel.tsx` (4.4) — header "Discovery" dialog: mode toggle (batch +
+  target-count input / continuous), start/stop, the standing-instructions list+box (upserts
+  `discovery_instructions`, visibly fed to every future round), and the live agent-activity log
+  reading the three namespaced streams (`logs:scraper`/`logs:review`/`logs:grading`,
+  color-coded). Polls `/api/discovery/status` while a run is live — dialog open or not — and
+  calls the dealflow refetch so nodes drop onto the map as they're scored. On mount it
+  reattaches to the latest run (incl. one that finished while the tab was closed).
+- `components/dealflow-view.tsx` — mounts `<DiscoveryPanel onRefresh={fetchData} />` next to
+  Run scoring; discovered companies flow through the EXACT same `/api/dealflow` layer and
+  `DealMap`/`DealBoard`/`CompanyReport` components as the seed set (4.5, zero special-casing —
+  they're just `companies` rows tagged `source='discovery:<key>'`).
+- `vercel.json` — `regions:["iad1"]` (the WDK Vercel-World backend region) and
+  `functions` config giving the stream route `supportsCancellation:true` (WDK gotcha: a route
+  piping `run.getReadable()` bills until max-duration on client disconnect without it).
+- Migration `supabase/migrations/20260718170000_discovery.sql` (4.1) — the two §3 tables,
+  applied via the dashboard SQL Editor (same manual path as Tier 0 / 1.5; no CLI link in repo).
+
+- [x] **4.1 Discovery data model.** ✅ Both tables exist (verified via PostgREST 200); a
+  hand-inserted `discovery_instructions` row was read back by id.
+- [x] **4.2 Source integrations.** ✅ Standalone run: YC 50, Product Hunt 25, HN 25, GitHub 25,
+  search (keyless HN fallback) 11 real candidates each, with real source URLs. Wellfound 0
+  (DataDome 403 — implemented, degrades gracefully, documented above).
+- [x] **4.3 Discovery workflow (Workflow DevKit).** ✅ Batch (target 2) run to completion
+  inserted 2 NEW companies, each with signals and a Tier-2 score (e.g. "Archal" [discovery:yc]
+  fit 58, pass reason "No signal shows any real product usage, customer deployment, or
+  traction…" — specific + falsifiable, citing real YC URLs). Continuous run inserted companies
+  then the Stop button ended it cleanly (status→stopped) via the resumed hook. **Verify (data
+  integrity):** across all runs, zero duplicate company names (name/domain dedupe + a live
+  last-line DB check hold); grading-failure rollback keeps unscored ghosts off the map.
+- [x] **4.4 Discovery settings UI.** ✅ Panel verified in a headless browser: mode toggle,
+  target input, start/stop, standing-instructions list (the persisted "prioritize AI infra and
+  devtools" row shows and is fed to the agents), and the live color-coded activity log replaying
+  all three namespaced streams (scraper source counts + triage picks, review dedupe/citation
+  rejections, grading scores). Reattaches to the last run on reload.
+- [x] **4.5 Map integration.** ✅ Discovered companies render as radial nodes (sector color,
+  name label, fit-position, shared-investor edges) identically to seed companies via the shared
+  data layer. **Tier gate:** started a batch run, moved the browser OFF the app (tab "closed"),
+  the run completed in the background (2 found), and a FRESH `/dealflow` reload showed the new
+  node ("Rindler") on the map — run → close tab → new node on reload, no console errors.
+
+Deploy state (2026-07-18): verified on a fresh Vercel PREVIEW built from the working tree
+(`vercel deploy`, uncommitted — production `main` untouched, same pattern as Tier 3). The
+build log shows `workflows build complete (10 steps, 1 workflow)` — the WDK build step
+registered the pipeline — and the app built in `iad1` (the Vercel-World backend region).
+On the preview: `/api/health` 200, `/` 200 (no SSO wall), the auth-gated discovery routes
+401 without a session and 200 with one; **a batch discovery run started via the deployed API
+ran to completion on the managed Vercel World** (`wrun_…`, status → completed, 2 companies
+found) and the deployed `/api/dealflow` served the discovered companies (fit + 4 signals +
+sharp pass reason each), rendering as radial nodes on the live URL. So the durable pipeline
+works on Vercel, not just locally. All QA artifacts (the throwaway test thesis/user, the
+discovered test companies, and the session's `discovery_runs`/`discovery_instructions` rows)
+were deleted afterwards to restore the pristine 43-company seed pool. Committing + merging
+`saahil` → `main` ships Tier 4 to production; the migration
+`supabase/migrations/20260718170000_discovery.sql` is already applied to the shared Supabase
+project (used by preview + prod), so no further DB step is needed on merge. `npm run build`
+and `npm run lint` green.
 
 ### Tier 5 — Outreach + Calendly (CUT FIRST IF BEHIND)
 Gate: a one-button flow updates status end to end.
