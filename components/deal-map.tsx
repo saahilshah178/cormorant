@@ -76,7 +76,7 @@ export function DealMap({
       <div className="pointer-events-none absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col gap-1.5">
         <p className="text-muted-foreground text-xs">
           Closer to center → higher thesis fit · lines → shared investor or
-          adjacent market
+          adjacent market · drag a company to nudge the layout
         </p>
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
           {legendSectors.map((sector) => (

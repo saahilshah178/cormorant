@@ -102,9 +102,21 @@ export default function GraphWrapper({
     <ForceGraph2D<GraphNode, GraphLink>
       ref={fgRef}
       graphData={graphData}
-      // Click-to-open-report is the only interaction; dragging would pin nodes
-      // and reheat the sim, so it stays off.
-      enableNodeDrag={false}
+      // Nodes are draggable again (the pre-anti-clustering behavior): the node
+      // is pinned to the pointer only for the duration of the drag and released
+      // on drop, so the radial force settles it back onto its fit ring —
+      // distance-from-center stays an honest fit readout and thesis swaps can
+      // still resettle every node. Clicks below the library's drag threshold
+      // never engage a drag, so click-to-open-report is unaffected. The
+      // anti-clustering fixes don't depend on drag being off: seeding lives in
+      // DealflowView and graphData identity stays memoized above.
+      enableNodeDrag={true}
+      onNodeDragEnd={(node) => {
+        // The library already clears these for initially-unpinned nodes; do it
+        // explicitly so a node can never stay pinned against the radial force.
+        node.fx = undefined;
+        node.fy = undefined;
+      }}
       width={width}
       height={height}
       backgroundColor="rgba(0,0,0,0)"
