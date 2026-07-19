@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Loader2Icon,
-  PlusIcon,
-  RadarIcon,
-  SquareIcon,
-  XIcon,
-} from "lucide-react";
+import { Loader2Icon, RadarIcon, SquareIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +16,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * Discovery settings panel (PLAN.md 4.4): a target-count input that finds
- * exactly that many companies, start/stop, persistent free-text instructions,
- * and the live agent-activity log read from the run's namespaced streams
- * (logs:scraper / logs:review / logs:grading).
+ * exactly that many companies, start/stop, and the live agent-activity log
+ * read from the run's namespaced streams (logs:scraper / logs:review /
+ * logs:grading). The agents are steered by the active thesis alone — to change
+ * what discovery looks for, edit the thesis or switch to another one.
  *
  * The run itself is a durable background workflow: closing the tab never
  * stops it. This component polls /api/discovery/status while a run is live
@@ -44,8 +39,6 @@ type DiscoveryRun = {
   stopped_at: string | null;
 };
 
-type Instruction = { id: string; text: string };
-
 type LogEntry = { agent: "scraper" | "review" | "grading"; line: string };
 
 const AGENT_COLORS: Record<LogEntry["agent"], string> = {
@@ -62,8 +55,6 @@ export function DiscoveryPanel({
   const [open, setOpen] = useState(false);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
   const [target, setTarget] = useState(5);
-  const [instructions, setInstructions] = useState<Instruction[]>([]);
-  const [draft, setDraft] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,22 +65,13 @@ export function DiscoveryPanel({
     if (res.ok) setRun(data.run ?? null);
   }, []);
 
-  const fetchInstructions = useCallback(async () => {
-    const res = await fetch("/api/discovery/instructions", {
-      cache: "no-store",
-    });
-    const data = await res.json();
-    if (res.ok) setInstructions(data.instructions ?? []);
-  }, []);
-
   // Reattach on mount: find the latest run (maybe finished while tab closed).
   useEffect(() => {
-    // False positive: every setState inside these happens after an await
+    // False positive: every setState inside this happens after an await
     // (the fetch), never synchronously in the effect body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStatus().catch(() => {});
-    fetchInstructions().catch(() => {});
-  }, [fetchStatus, fetchInstructions]);
+  }, [fetchStatus]);
 
   // While a run is live, poll status and refresh the map so new nodes drop in
   // — dialog open or not (the run is a background job, not a modal state).
@@ -186,42 +168,6 @@ export function DiscoveryPanel({
     }
   }, [run, fetchStatus]);
 
-  const addInstruction = useCallback(async () => {
-    const text = draft.trim();
-    if (!text) return;
-    setError(null);
-    try {
-      const res = await fetch("/api/discovery/instructions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setDraft("");
-      await fetchInstructions();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [draft, fetchInstructions]);
-
-  const removeInstruction = useCallback(
-    async (id: string) => {
-      setError(null);
-      try {
-        await fetch("/api/discovery/instructions", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id }),
-        });
-        await fetchInstructions();
-      } catch {
-        // list refetch below will show the truth
-      }
-    },
-    [fetchInstructions],
-  );
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
@@ -301,47 +247,11 @@ export function DiscoveryPanel({
           </div>
         )}
 
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium">
-            Standing instructions to the agents
-          </span>
-          {instructions.length > 0 && (
-            <ul className="flex flex-col gap-1">
-              {instructions.map((ins) => (
-                <li
-                  key={ins.id}
-                  className="bg-muted/50 flex items-start justify-between gap-2 rounded-md px-2 py-1 text-xs"
-                >
-                  <span>{ins.text}</span>
-                  <button
-                    aria-label="Remove instruction"
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                    onClick={() => removeInstruction(ins.id)}
-                  >
-                    <XIcon className="size-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex gap-2">
-            <Input
-              placeholder='e.g. "prioritize fintech infra, avoid consumer social"'
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addInstruction();
-              }}
-            />
-            <Button variant="outline" size="sm" onClick={addInstruction}>
-              <PlusIcon /> Add
-            </Button>
-          </div>
-          <p className="text-muted-foreground text-xs">
-            Every active instruction is fed to the scraper, review, and grading
-            agents on all future rounds.
-          </p>
-        </div>
+        <p className="text-muted-foreground text-xs">
+          The agents follow the active thesis — its stages, industries, and
+          written focus steer scraping, review, and grading. To steer discovery
+          differently, edit the thesis or switch to another one.
+        </p>
 
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium">Agent activity</span>

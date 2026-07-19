@@ -9,6 +9,10 @@
  * - Product Hunt via its public Atom feed.
  * - GitHub via the keyless search API (10 req/min unauthenticated — fine for
  *   one call per discovery round).
+ * - TechCrunch via its public WordPress REST search — the funding-news pass
+ *   that gives later-stage (Series A/B) theses real supply; the launch-oriented
+ *   sources above rarely surface those. (VentureBeat and Finsmes bot-wall
+ *   their wp-json, verified 2026-07-18 — TechCrunch is the one that works.)
  * - Wellfound is DataDome bot-walled (403 challenge page from every network
  *   tried, incl. via proxies); the function stays implemented and returns []
  *   with a warning when blocked, and parses normally if it ever unblocks.
@@ -37,16 +41,24 @@ export type SourceKey =
   | "hackernews"
   | "github"
   | "wellfound"
-  | "search";
+  | "search"
+  | "news";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 const PER_SOURCE_CAP = 40;
 
-async function get(url: string, headers: Record<string, string> = {}) {
+/** Shared browser-like fetch — also used by the review agent's citation
+ * verification, which previously sent a "CormorantBot" UA that got 403'd by
+ * pages that serve these headers fine. */
+export async function get(url: string, headers: Record<string, string> = {}) {
   return fetch(url, {
-    headers: { "User-Agent": UA, ...headers },
+    headers: {
+      "User-Agent": UA,
+      "Accept-Language": "en-US,en;q=0.9",
+      ...headers,
+    },
     signal: AbortSignal.timeout(15_000),
     cache: "no-store",
   });
@@ -389,6 +401,74 @@ async function searchGitHubRepos(query: string): Promise<Candidate[]> {
   }));
 }
 
+/**
+ * Funding/startup news via TechCrunch's public WordPress REST search (keyless,
+ * verified live 2026-07-18). This is the pass that reaches later-stage and
+ * niche companies: a "Series B fintech" thesis finds its supply in funding
+ * announcements, not on Show HN. Article pages themselves fetch fine
+ * server-side, so the review agent can verify the citation normally.
+ */
+export async function fetchNewsCandidates(query: string): Promise<Candidate[]> {
+  const res = await get(
+    `https://techcrunch.com/wp-json/wp/v2/posts?search=${encodeURIComponent(query)}&per_page=20&_fields=link,title,excerpt,date`,
+    { Accept: "application/json" },
+  );
+  if (!res.ok) throw new Error(`TechCrunch search ${res.status}`);
+  const posts = (await res.json()) as {
+    link?: string;
+    date?: string;
+    title?: { rendered?: string };
+    excerpt?: { rendered?: string };
+  }[];
+  return (posts ?? [])
+    .filter((p) => p.link && p.title?.rendered)
+    .slice(0, PER_SOURCE_CAP)
+    .map((p) => {
+      const title = stripTags(p.title?.rendered ?? "");
+      return {
+        name: companyNameFromHeadline(title),
+        snippet: [
+          title,
+          p.excerpt?.rendered ? stripTags(p.excerpt.rendered).slice(0, 240) : "",
+          `TechCrunch${p.date ? `, ${p.date.slice(0, 10)}` : ""} (matched search: "${query}")`,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        source_url: p.link as string,
+        source: "news" as const,
+        website: null,
+      };
+    });
+}
+
+/**
+ * Best-effort company name from a news headline ("Sarvam becomes India's
+ * newest AI unicorn…" → "Sarvam"; "IQM, Europe's first public quantum company,
+ * admits…" → "IQM"). The review agent canonicalizes the name from the article
+ * text; this only has to be good enough for triage, dedupe, and logs.
+ */
+const HEADLINE_VERBS =
+  "raises|raised|lands|landed|secures|secured|nabs|nabbed|closes|closed|banks|snags|grabs|scores|collects|picks|pulls|gets|got|hits|reaches|becomes|is|has|wants|aims|launches|launched|debuts|unveils|expands|acquires|buys|partners|teams|tops|valued|eyes|plans|brings|turns|joins|files|doubles|triples|admits|says|announces|reveals|wins|sees|adds|ships|reports|claims|warns|faces|seeks|exits|sells|inks|signs";
+
+function companyNameFromHeadline(title: string): string {
+  const t = title.replace(/^(?:exclusive|breaking|report)[:,]\s*/i, "").trim();
+  // "<Name>[, appositive,] <verb> …"
+  const lead = t.match(
+    new RegExp(
+      `^([A-Z][\\w.&'’-]*(?:\\s+[A-Z][\\w.&'’-]*){0,3})(?:,[^,]{0,80},)?\\s+(?:${HEADLINE_VERBS})\\b`,
+    ),
+  );
+  if (lead) return lead[1].trim();
+  // "… startup <Name> <verb> …" ("Fintech startup Mercury lands $300M…")
+  const mid = t.match(
+    new RegExp(
+      `\\b(?:startup|company|firm)\\s+([A-Z][\\w.&'’-]*(?:\\s+[A-Z][\\w.&'’-]*){0,2})\\s+(?:${HEADLINE_VERBS})\\b`,
+    ),
+  );
+  if (mid) return mid[1].trim();
+  return t;
+}
+
 /** Dispatcher the workflow steps call by key (functions aren't serializable). */
 export async function fetchSourceCandidates(
   key: SourceKey,
@@ -407,6 +487,8 @@ export async function fetchSourceCandidates(
       return fetchWellfoundCandidates();
     case "search":
       return searchCandidates(searchQuery ?? "AI startup seed round");
+    case "news":
+      return fetchNewsCandidates(searchQuery ?? "startup funding round");
   }
 }
 

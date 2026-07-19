@@ -7,19 +7,27 @@ import { scoreCompany, type SignalRow } from "@/lib/scoring";
 import {
   FIXED_SOURCES,
   fetchSourceCandidates,
+  get as httpGet,
   type Candidate,
   type SourceKey,
 } from "@/lib/discovery/sources";
-import type { Thesis } from "@/lib/thesis-schema";
+import {
+  INDUSTRY_LABELS,
+  STAGE_LABELS,
+  type Thesis,
+} from "@/lib/thesis-schema";
 
 /**
  * Tier 4 discovery pipeline (PLAN.md 4.3), a Workflow DevKit durable run:
  *
- *   parallel scraper steps (one per fixed source + the search step, each
- *   reading the thesis + active discovery_instructions)
- *     → parallel review steps (dedupe against existing companies, fetch the
- *       source_url and verify it actually mentions the company, extract
- *       structured signals with the cheap model, reject anything uncited)
+ *   parallel scraper steps (one per fixed source + the query-driven search and
+ *   funding-news steps, each steered by the active thesis alone — the VC edits
+ *   the thesis to steer discovery; there is no separate instruction channel)
+ *     → parallel review steps (dedupe against existing companies, verify the
+ *       citation actually loads and mentions the company — falling back to the
+ *       company's own website, then to the source's first-party feed excerpt,
+ *       when the source page bot-walls server fetches — and extract structured
+ *       signals with the cheap model, rejecting anything uncited)
  *     → a grading step per candidate that calls the same scoreCompany as
  *       Tier 2, unchanged
  *     → insert (company + signals + score, tagged source='discovery:<key>')
@@ -52,7 +60,6 @@ export type DiscoveryInput = {
 
 type RunContext = {
   status: string;
-  instructions: string;
   existingNames: string[];
   existingDomains: string[];
 };
@@ -89,15 +96,8 @@ async function writeLine(namespace: string | undefined, line: string) {
 async function loadContext(runId: string, userId: string): Promise<RunContext> {
   "use step";
   const db = getSupabaseAdmin();
-  const [runRes, instrRes, companiesRes] = await Promise.all([
+  const [runRes, companiesRes] = await Promise.all([
     db.from("discovery_runs").select("status").eq("id", runId).maybeSingle(),
-    // This VC's own standing instructions only — never another account's.
-    db
-      .from("discovery_instructions")
-      .select("text")
-      .eq("active", true)
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true }),
     // Dedupe against the shared seed pool + this VC's own companies, so each
     // account can independently discover a company another account already has.
     db
@@ -105,10 +105,6 @@ async function loadContext(runId: string, userId: string): Promise<RunContext> {
       .select("name, website")
       .or(`user_id.is.null,user_id.eq.${userId}`),
   ]);
-  const instructions = (instrRes.data ?? [])
-    .map((r) => r.text)
-    .filter(Boolean)
-    .join("\n");
   const existingNames = (companiesRes.data ?? []).map((c) =>
     normalizeName(c.name),
   );
@@ -117,7 +113,6 @@ async function loadContext(runId: string, userId: string): Promise<RunContext> {
     .filter((d): d is string => Boolean(d));
   return {
     status: runRes.data?.status ?? "running",
-    instructions,
     existingNames,
     existingDomains,
   };
@@ -134,12 +129,11 @@ const scraperPickSchema = z.object({
  * One scraper agent: fetch+parse a source, drop anything already indexed or
  * already reviewed this run (so each round advances to fresh companies rather
  * than re-triaging the same top picks), then let the cheap model pick the few
- * worth the review pass given the thesis + VC instructions.
+ * worth the review pass given the thesis.
  */
 async function scrapeSource(
   key: SourceKey,
   thesisSummary: string,
-  instructions: string,
   excludeKeys: string[],
   searchQuery?: string,
 ): Promise<Candidate[]> {
@@ -179,11 +173,12 @@ async function scrapeSource(
       system:
         "You triage raw startup-discovery mentions for a VC deal-flow pipeline. " +
         "Select ONLY plausible startup companies (not libraries, listicles, blog posts, or hobby demos with no company behind them) " +
-        "that are worth a deeper review given the VC's thesis and instructions. Prefer on-thesis or adjacent candidates. " +
+        "that are worth a deeper review given the VC's thesis. Prefer on-thesis or adjacent candidates, and respect the thesis's target stages: " +
+        "when the thesis targets later stages (Series A/B), skip fresh hobby launches and tiny demos that cannot plausibly be there yet; " +
+        "when it targets pre-seed/seed, skip large established companies. " +
         "Return at most 8 indices, best first. Return an empty list if nothing qualifies.",
       prompt: [
         `## VC thesis\n${thesisSummary}`,
-        instructions ? `## Standing VC instructions\n${instructions}` : "",
         `## Candidates from source "${key}"`,
         JSON.stringify(
           fresh.map((c, i) => ({ i, name: c.name, snippet: c.snippet })),
@@ -256,15 +251,108 @@ const reviewSchema = z.object({
     .describe("Signals extractable from the page content; empty if none"),
 });
 
+/** The verified evidence a review decision is grounded in: the page text that
+ * was actually fetched, and the URL that becomes the signals' citation. `thin`
+ * means the source bot-walls server fetches and the only verifiable content is
+ * the source's own feed/API excerpt — allowed, but confidence-capped. */
+type Evidence = { text: string; url: string; thin: boolean };
+
+/** Fetch a page as evidence text (tags stripped), with one retry on transient
+ * failures. Uses the same browser-like headers as the source fetchers — the
+ * old "CormorantBot" UA was itself the cause of many 403 "not citable" rejects. */
+async function fetchPageText(
+  url: string,
+): Promise<{ ok: boolean; status: number; text: string }> {
+  for (let attempt = 0; ; attempt++) {
+    let status = 0;
+    try {
+      const res = await httpGet(url);
+      status = res.status;
+      if (res.ok) {
+        const text = (await res.text())
+          .replace(/<script[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .slice(0, 6000);
+        return { ok: true, status, text };
+      }
+    } catch {
+      // network error / timeout — retry once below
+    }
+    if (attempt === 0 && (status === 0 || status === 429 || status >= 500)) {
+      await new Promise((r) => setTimeout(r, 1500));
+      continue;
+    }
+    return { ok: false, status, text: "" };
+  }
+}
+
 /**
- * One review agent per candidate: dedupe, verify the source URL actually
- * loads and mentions the company, extract structured signals (cheap model).
- * Returns null when rejected (with the reason logged).
+ * Resolve the evidence page for a candidate. Chain: the source page itself →
+ * the company's own website (when the source bot-walls server fetches but the
+ * page exists for a human clicking the citation) → the source's first-party
+ * feed excerpt (e.g. Product Hunt, whose post pages 403 every server fetch but
+ * whose feed IS producthunt.com's own content about the candidate). A 404/410
+ * or a page that doesn't mention the company still rejects outright.
+ */
+async function resolveEvidence(
+  candidate: Candidate,
+  log: (msg: string) => Promise<void>,
+): Promise<Evidence | null> {
+  const nameToken = candidate.name.split(/[\s:–—-]+/)[0]?.toLowerCase() ?? "";
+  const mentions = (text: string) =>
+    !nameToken || text.toLowerCase().includes(nameToken);
+
+  const src = await fetchPageText(candidate.source_url);
+  if (src.ok) {
+    if (mentions(src.text)) {
+      return { text: src.text, url: candidate.source_url, thin: false };
+    }
+    await log("rejected: page does not mention the company — citation unsupported");
+    return null;
+  }
+  if (src.status === 404 || src.status === 410) {
+    await log(`rejected: source_url ${src.status} — page gone`);
+    return null;
+  }
+  const blocked = src.status || "unreachable";
+  const siteUrl = candidate.website
+    ? candidate.website.startsWith("http")
+      ? candidate.website
+      : `https://${candidate.website}`
+    : null;
+  if (siteUrl && domainOf(siteUrl) !== domainOf(candidate.source_url)) {
+    const site = await fetchPageText(siteUrl);
+    if (site.ok && mentions(site.text)) {
+      await log(
+        `source_url blocked (${blocked}); citing the company website instead`,
+      );
+      return { text: site.text, url: siteUrl, thin: false };
+    }
+  }
+  if (candidate.snippet.trim().length >= 40) {
+    await log(
+      `source_url bot-walled (${blocked}); grounding in the source's own feed excerpt — thin evidence`,
+    );
+    return { text: candidate.snippet, url: candidate.source_url, thin: true };
+  }
+  await log(`rejected: source_url ${blocked} and no fallback evidence`);
+  return null;
+}
+
+/** Thin-evidence signals never claim more confidence than a one-line feed
+ * excerpt can support — enforced in code, not just asked of the model. */
+const THIN_EVIDENCE_MAX_CONFIDENCE = 0.4;
+
+/**
+ * One review agent per candidate: dedupe, verify the citation actually loads
+ * and mentions the company (with the resolveEvidence fallback chain), extract
+ * structured signals (cheap model). Returns null when rejected (reason logged).
  */
 async function reviewCandidate(
   candidate: Candidate,
   thesisSummary: string,
-  instructions: string,
   existingNames: string[],
   existingDomains: string[],
   allowedStages: string[],
@@ -284,34 +372,8 @@ async function reviewCandidate(
     return null;
   }
 
-  // Verify the citation: the source_url must load and mention the candidate.
-  let pageText: string;
-  try {
-    const res = await fetch(candidate.source_url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; CormorantBot/1.0)" },
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) {
-      await log(`rejected: source_url ${res.status} — not citable`);
-      return null;
-    }
-    pageText = (await res.text())
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .slice(0, 6000);
-  } catch (err) {
-    await log(
-      `rejected: source_url unreachable (${err instanceof Error ? err.message.slice(0, 80) : err})`,
-    );
-    return null;
-  }
-  const nameToken = candidate.name.split(/[\s:–—-]+/)[0]?.toLowerCase() ?? "";
-  if (nameToken && !pageText.toLowerCase().includes(nameToken)) {
-    await log("rejected: page does not mention the company — citation unsupported");
-    return null;
-  }
+  const evidence = await resolveEvidence(candidate, log);
+  if (!evidence) return null; // reason already logged
 
   let extracted: z.infer<typeof reviewSchema>;
   try {
@@ -327,9 +389,11 @@ async function reviewCandidate(
         allowedStages.length
           ? `## Target stages\nThe VC only wants companies at these stages: ${allowedStages.join(", ")}. Determine the company's stage as accurately as you can from the page.`
           : "",
-        instructions ? `## Standing VC instructions\n${instructions}` : "",
         `## Candidate\n${JSON.stringify({ name: candidate.name, snippet: candidate.snippet, source: candidate.source, source_url: candidate.source_url, website: candidate.website })}`,
-        `## Source page content (truncated)\n${pageText}`,
+        evidence.thin
+          ? `## Evidence caveat\nThe cited page blocks server-side fetches (it loads normally in a browser). The ONLY verifiable content is the source's own published excerpt below. Extract at most 2 signals grounded strictly in it, and cap every signal's confidence at ${THIN_EVIDENCE_MAX_CONFIDENCE}.`
+          : "",
+        `## ${evidence.thin ? "Source feed excerpt (the only verifiable content)" : "Source page content (truncated)"}\n${evidence.text}`,
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -374,8 +438,17 @@ async function reviewCandidate(
     return null;
   }
 
+  // Thin evidence (feed excerpt only): keep at most 2 signals and cap their
+  // confidence in code, so the honesty guarantee doesn't rest on the prompt.
+  const signals = evidence.thin
+    ? extracted.signals.slice(0, 2).map((s) => ({
+        ...s,
+        confidence: Math.min(s.confidence, THIN_EVIDENCE_MAX_CONFIDENCE),
+      }))
+    : extracted.signals;
+
   await log(
-    `accepted: ${extracted.signals.length} signal(s), sector=${extracted.sector ?? "?"}, stage=${extracted.stage ?? "?"}`,
+    `accepted: ${signals.length} signal(s), sector=${extracted.sector ?? "?"}, stage=${extracted.stage ?? "?"}${evidence.thin ? " (thin evidence)" : ""}`,
   );
   return {
     name: extracted.name,
@@ -383,8 +456,8 @@ async function reviewCandidate(
     sector: extracted.sector,
     stage: extracted.stage,
     source: candidate.source,
-    source_url: candidate.source_url,
-    signals: extracted.signals,
+    source_url: evidence.url,
+    signals,
   };
 }
 
@@ -568,11 +641,11 @@ function summarizeThesis(thesis: Thesis): string {
  * companies the fixed sources miss.
  */
 const QUERY_SHAPES = [
-  (industry: string, stage: string) => `${industry} startup ${stage} launch`,
+  (industry: string, stage: string) => `${industry} startup ${stage}`,
   (industry: string, stage: string) =>
     `${industry} ${stage} funding announcement`,
-  (industry: string) => `new ${industry} company building`,
-  (industry: string) => `early stage ${industry} startup`,
+  (industry: string) => `new ${industry} company launch`,
+  (industry: string, stage: string) => `${stage} ${industry} raise`,
 ];
 
 const NICHE_QUALIFIERS = [
@@ -587,56 +660,47 @@ const NICHE_QUALIFIERS = [
   "AI agents",
 ];
 
-/**
- * Pull the concrete steering terms out of the free-text VC instructions so they
- * actually shape what the search source fetches — not just how candidates are
- * later triaged. We keep the POSITIVE guidance (what to look for) and drop
- * negative "avoid/exclude/no ..." clauses, since keyword search can't negate and
- * feeding "avoid consumer" would only pull consumer results in. Exclusions are
- * still honored downstream by the triage/review agents, which do get the full
- * instruction text.
- */
-function instructionSearchTerms(instructions: string): string {
-  if (!instructions.trim()) return "";
-  return instructions
-    .split(/[\n,.;]+/)
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .filter((c) => !/^(avoid|exclude|no|not|skip|ignore|don'?t)\b/i.test(c))
-    .map((c) => c.replace(/^(prioriti[sz]e|prefer|focus on|look for)\s+/i, ""))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 160);
+/** Thesis slugs make bad search terms ("ai_infra", "series_b") — query with
+ * the human labels ("AI infra", "Series B") instead. */
+function humanTerm(slug: string, labels: Record<string, string>): string {
+  return labels[slug] ?? slug.replace(/_/g, " ");
 }
 
-function buildSearchQuery(
-  thesis: Thesis,
-  round: number,
-  instructions = "",
-): string {
+function buildSearchQuery(thesis: Thesis, round: number): string {
   const industries = thesis.industries?.length ? thesis.industries : ["AI"];
-  const industry = industries[(round - 1) % industries.length];
+  const industry = humanTerm(
+    industries[(round - 1) % industries.length],
+    INDUSTRY_LABELS,
+  );
   // Rotate across the thesis's selected stages so multi-stage theses widen the
   // net over all of them across rounds rather than fixating on one.
   const stages = thesis.stages?.length ? thesis.stages : ["seed"];
-  const stage = stages[(round - 1) % stages.length].replace("_", "-");
-
-  // The VC's standing instructions steer WHAT we search for, not only how we
-  // triage — without this the query is built purely from the thesis and the
-  // instructions never change what the search source actually returns.
-  const steer = instructionSearchTerms(instructions);
+  const stage = humanTerm(stages[(round - 1) % stages.length], STAGE_LABELS);
 
   // Every third round: narrow into a niche vertical rather than the broad term.
-  let base: string;
   if (round % 3 === 0) {
     const qualifier = NICHE_QUALIFIERS[(round - 1) % NICHE_QUALIFIERS.length];
-    base = `${industry} ${qualifier} startup`;
-  } else {
-    const shape = QUERY_SHAPES[(round - 1) % QUERY_SHAPES.length];
-    base = shape(industry, stage);
+    return `${industry} ${qualifier} startup`;
   }
-  return steer ? `${base} ${steer}` : base;
+  const shape = QUERY_SHAPES[(round - 1) % QUERY_SHAPES.length];
+  return shape(industry, stage);
+}
+
+/**
+ * Funding-news query for the TechCrunch pass — where later-stage (Series A/B)
+ * and niche supply actually lives. Rotates industry and stage with the round,
+ * alternating query shapes so consecutive rounds surface different articles.
+ */
+function buildNewsQuery(thesis: Thesis, round: number): string {
+  const industries = thesis.industries?.length ? thesis.industries : ["AI"];
+  const industry = humanTerm(
+    industries[(round - 1) % industries.length],
+    INDUSTRY_LABELS,
+  );
+  const stages = thesis.stages?.length ? thesis.stages : [];
+  if (stages.length === 0) return `${industry} startup funding`;
+  const stage = humanTerm(stages[(round - 1) % stages.length], STAGE_LABELS);
+  return round % 2 === 0 ? `${industry} startup ${stage}` : `${industry} ${stage}`;
 }
 
 function dedupeCandidates(candidates: Candidate[]): Candidate[] {
@@ -689,20 +753,27 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
       );
       await writeLine(
         "logs:scraper",
-        `— round ${round}: scraping ${FIXED_SOURCES.length} fixed sources + search (excluding ${excludeKeys.length} already seen) —`,
+        `— round ${round}: scraping ${FIXED_SOURCES.length} fixed sources + search + news (excluding ${excludeKeys.length} already seen) —`,
       );
 
-      // Parallel scraper agents (one per fixed source + the search agent).
+      // Parallel scraper agents: one per fixed source, plus the query-driven
+      // search and funding-news agents (the news pass is what reaches
+      // later-stage / niche supply the launch-oriented sources don't carry).
       const batches = await Promise.all([
         ...FIXED_SOURCES.map((key) =>
-          scrapeSource(key, thesisSummary, ctx.instructions, excludeKeys),
+          scrapeSource(key, thesisSummary, excludeKeys),
         ),
         scrapeSource(
           "search",
           thesisSummary,
-          ctx.instructions,
           excludeKeys,
-          buildSearchQuery(input.thesis, round, ctx.instructions),
+          buildSearchQuery(input.thesis, round),
+        ),
+        scrapeSource(
+          "news",
+          thesisSummary,
+          excludeKeys,
+          buildNewsQuery(input.thesis, round),
         ),
       ]);
 
@@ -737,7 +808,6 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
           reviewCandidate(
             c,
             thesisSummary,
-            ctx.instructions,
             ctx.existingNames,
             ctx.existingDomains,
             input.thesis.stages ?? [],
