@@ -1,16 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLinkIcon, MailIcon } from "lucide-react";
+import { ExternalLinkIcon, MailIcon, PencilIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { GMAIL_SCOPE, GOOGLE_OAUTH_QUERY_PARAMS } from "@/lib/gmail-scope";
+import {
+  DEFAULT_OUTREACH_TEMPLATE,
+  TEMPLATE_PLACEHOLDERS,
+  validateOutreachTemplate,
+} from "@/lib/outreach-template";
 
 /**
- * Tier 5 One-click contact (PLAN.md 5.3): the button at the bottom of every
- * company report. Click -> a draft appears in the signed-in VC's own Gmail
- * (founder's email pre-filled when one is public), ready to send from Gmail.
- * The app never sends anything.
+ * Tier 5 One-click contact (PLAN.md 5.3/5.4): the button at the bottom of
+ * every company report. Click -> a draft appears in the signed-in VC's own
+ * Gmail (founder's email pre-filled when one is public), ready to send from
+ * Gmail. "Edit draft template" customizes the subject/body used for every
+ * future draft, saved to the account. The app never sends anything.
  */
 
 type OutreachState = {
@@ -20,6 +32,164 @@ type OutreachState = {
 };
 
 const GMAIL_DRAFTS_URL = "https://mail.google.com/mail/u/0/#drafts";
+
+function TemplateEditor({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [subject, setSubject] = useState(DEFAULT_OUTREACH_TEMPLATE.subject);
+  const [body, setBody] = useState(DEFAULT_OUTREACH_TEMPLATE.body);
+  const [isCustom, setIsCustom] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch("/api/outreach/template")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.template) return;
+        setSubject(json.template.subject);
+        setBody(json.template.body);
+        setIsCustom(Boolean(json.is_custom));
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const save = useCallback(async () => {
+    const invalid = validateOutreachTemplate({ subject, body });
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/outreach/template", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, body }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setIsCustom(true);
+        onOpenChange(false);
+      } else {
+        setError(json.error ?? `Save failed (${res.status}).`);
+      }
+    } catch {
+      setError("Network error — try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, [subject, body, onOpenChange]);
+
+  const reset = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/outreach/template", { method: "DELETE" });
+      if (res.ok) {
+        setSubject(DEFAULT_OUTREACH_TEMPLATE.subject);
+        setBody(DEFAULT_OUTREACH_TEMPLATE.body);
+        setIsCustom(false);
+      }
+    } catch {
+      setError("Network error — try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <div className="flex flex-col gap-4">
+          <div>
+            <DialogTitle>Draft template</DialogTitle>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Every One-click contact draft uses this template until you change
+              it. It saves to your account.
+            </p>
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              Subject
+            </span>
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              disabled={!loaded || saving}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+              Body
+            </span>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              disabled={!loaded || saving}
+              rows={10}
+              className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50"
+            />
+          </label>
+
+          <p className="text-muted-foreground text-xs">
+            Placeholders:{" "}
+            {TEMPLATE_PLACEHOLDERS.map((p, i) => (
+              <span key={p.token}>
+                {i > 0 && " · "}
+                <code className="bg-muted rounded px-1">{p.token}</code>{" "}
+                {p.meaning}
+              </span>
+            ))}
+          </p>
+
+          {error && <p className="text-destructive text-xs">{error}</p>}
+
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={reset}
+              disabled={!loaded || saving || !isCustom}
+              title={isCustom ? undefined : "Already using the default template"}
+            >
+              Reset to default
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button size="sm" onClick={save} disabled={!loaded || saving}>
+                {saving ? "Saving…" : "Save template"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function OneClickContact({
   companyId,
@@ -32,6 +202,7 @@ export function OneClickContact({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsReauth, setNeedsReauth] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   // Per-company state reset happens by remount: the report renders this
   // component with key={company.id} (the panel swaps companies in place).
@@ -97,6 +268,17 @@ export function OneClickContact({
     });
   }, []);
 
+  const editTemplateLink = (
+    <button
+      type="button"
+      onClick={() => setEditorOpen(true)}
+      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-start text-xs underline underline-offset-2"
+    >
+      <PencilIcon className="size-3" />
+      Edit draft template
+    </button>
+  );
+
   if (state?.status === "drafted") {
     return (
       <div className="flex flex-col gap-1.5">
@@ -118,6 +300,8 @@ export function OneClickContact({
           Open Gmail drafts
           <ExternalLinkIcon className="size-3" />
         </a>
+        {editTemplateLink}
+        <TemplateEditor open={editorOpen} onOpenChange={setEditorOpen} />
       </div>
     );
   }
@@ -135,18 +319,20 @@ export function OneClickContact({
           </p>
         </>
       ) : (
-        <Button size="sm" onClick={contact} disabled={working || state === null}>
-          <MailIcon className="size-4" />
-          {working ? "Drafting…" : "One-click contact"}
-        </Button>
+        <>
+          <Button size="sm" onClick={contact} disabled={working || state === null}>
+            <MailIcon className="size-4" />
+            {working ? "Drafting…" : "One-click contact"}
+          </Button>
+          <p className="text-muted-foreground text-xs">
+            Drafts a meeting-request email to the {companyName} founders in your
+            own Gmail — nothing is sent until you send it.
+          </p>
+        </>
       )}
-      {!needsReauth && (
-        <p className="text-muted-foreground text-xs">
-          Drafts a meeting-request email to the {companyName} founders in your
-          own Gmail — nothing is sent until you send it.
-        </p>
-      )}
+      {editTemplateLink}
       {error && <p className="text-destructive text-xs">{error}</p>}
+      <TemplateEditor open={editorOpen} onOpenChange={setEditorOpen} />
     </div>
   );
 }

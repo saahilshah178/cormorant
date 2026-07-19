@@ -4,6 +4,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { getActiveThesis } from "@/lib/theses";
 import { resolveFounderEmail } from "@/lib/founder-email";
 import {
+  DEFAULT_OUTREACH_TEMPLATE,
+  renderOutreachTemplate,
+  type OutreachTemplate,
+} from "@/lib/outreach-template";
+import {
   createGmailDraft,
   getGmailAccessToken,
   GmailApiDisabledError,
@@ -89,18 +94,18 @@ export async function POST(req: Request) {
     fitLine = score?.fit_rationale?.match(/^[^.!?]{10,240}[.!?]/)?.[0]?.trim() ?? null;
   }
 
-  const subject = `Meeting request — ${company.name}`;
-  const body = [
-    `Hi ${company.name} team,`,
-    "",
-    `I'm an investor and ${company.name} caught my attention.` +
-      (fitLine ? ` ${fitLine}` : ""),
-    "",
-    "Would you be open to a quick intro call? When are you free to meet in the next week or two?",
-    "",
-    "Best,",
-    user.email ?? "",
-  ].join("\n");
+  // The VC's saved template (PLAN.md 5.4), falling back to the default.
+  const saved = user.user_metadata?.outreach_template as
+    | OutreachTemplate
+    | null
+    | undefined;
+  const template =
+    saved?.subject && saved?.body ? saved : DEFAULT_OUTREACH_TEMPLATE;
+  const { subject, body } = renderOutreachTemplate(template, {
+    company: company.name,
+    fit_reason: fitLine ?? "",
+    sender: user.email ?? "",
+  });
 
   let draftId: string;
   try {

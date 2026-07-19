@@ -757,34 +757,32 @@ is deliberately smaller: the app *drafts*, the VC *sends from their own Gmail*. 
 keeps the §1 "no real outbound messages during judging" rule structurally true — a draft
 sitting in Drafts sends nothing. The `outreach` table is re-shaped accordingly (see §3).
 
-**Status — TIER 5 BUILT, CODE-COMPLETE, PARTIALLY GATE-VERIFIED (2026-07-19).**
-`npm run build` and `npm run lint` green. What is verified vs. what still needs two manual
-dashboard steps (which no autonomous session can do — same class as every prior migration):
+**Status — TIER 5 COMPLETE ✅ (2026-07-19, gate verified end-to-end against real Gmail).**
+`npm run build` and `npm run lint` green. The manual dashboard steps are DONE (migration
+applied via the SQL editor, Gmail API enabled in the Google Cloud project, one consent
+sign-in completed), and the full pipeline is verified live: One-click contact → founder
+email resolved → a real draft in the signed-in VC's Gmail Drafts with To/Subject/body
+correct. Nothing is ever sent by the app.
 
-Verified end-to-end in a headless browser (localhost, real DB, magic-link QA session):
+Verified (headless-browser QA session + a scripted round-trip on the real account):
 - The "One-click contact" button renders at the bottom of the company report (board dialog;
-  the map panel shares the component).
-- Click → `POST /api/outreach/contact` → with no Gmail tokens on file the route returns the
-  typed `gmail_reauth_required` 401 and the UI swaps to the "Connect Gmail to draft
-  outreach" state with an explainer — the graceful-degradation path of 5.1, working.
-- The Connect Gmail button → Supabase OAuth → lands on accounts.google.com with EXACTLY
+  the map panel shares the component); click → real Gmail draft; report flips to "Drafted".
+- Graceful degradation both pre-migration and pre-consent: typed `gmail_reauth_required`
+  401 → "Connect Gmail to draft outreach" → accounts.google.com with EXACTLY
   `scope=email profile https://www.googleapis.com/auth/gmail.compose`,
-  `access_type=offline`, `prompt=consent` — the 5.1 scope/offline wiring, verified live.
-- `/api/outreach` GET degrades to `not_contacted` while the migration is unapplied; no 500s.
-- QA artifacts (throwaway user, thesis, 3 scores) deleted afterwards; seed pool pristine.
-
-Remaining MANUAL steps to light it up fully (blocked for an agent: the Supabase dashboard
-session and Google account are the user's; an autonomous run was correctly denied both):
-1. Supabase dashboard → SQL Editor → run
-   `supabase/migrations/20260719160000_outreach_contact.sql` (re-shapes `outreach`, creates
-   `gmail_tokens` — see §3).
-2. Google Cloud console (same project as the OAuth client) → enable the **Gmail API**
-   (APIs & Services → Library → Gmail API → Enable).
-3. Sign out, sign back in with Google once (the consent screen now asks for Gmail
-   draft access) — the callback stores the provider tokens; then One-click contact
-   creates real drafts. Optionally put the OAuth client id/secret in env as
-   `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (see `.env.example`) for silent token
-   refresh after the first hour; without them the UI offers re-consent when needed.
+  `access_type=offline`, `prompt=consent`. No 500s anywhere.
+- **Subject-encoding bugfix:** the first live draft rendered "Meeting request â€” …" —
+  raw UTF-8 in the Subject header, which is ASCII-only by spec (the body was fine; it
+  declares charset=UTF-8). Fixed with chunked RFC 2047 encoded-words
+  (`=?UTF-8?B?…?=`, ≤75 chars/word, never splitting a multi-byte char) in
+  `lib/gmail.ts`. Round-trip verified against the live Gmail API: a subject with an em
+  dash, `×`, and `✓` came back from `drafts.get` byte-identical, zero mojibake.
+- The 5.4 template PUT→GET→draft-uses-it→DELETE(reset) cycle verified on the real
+  account; the verification draft + its outreach row were deleted and the template reset,
+  leaving the account untouched.
+- `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` env (silent token refresh after the ~1h
+  provider-token expiry) remains optional — without it the UI offers re-consent when
+  needed (see `.env.example`).
 
 Implementation notes:
 - `lib/gmail.ts` — provider-token store + refresh + `drafts.create` (RFC 2822 MIME,
@@ -840,7 +838,19 @@ Implementation notes:
   migration. Once a draft exists the report shows a "Drafted" state (with a link out to
   Gmail Drafts) instead of the button.
   **Done (tier gate):** click the button → open Gmail → the draft sits in Drafts addressed
-  to the founder with subject and body; the report shows "Drafted"; nothing was sent.
+  to the founder with subject and body; the report shows "Drafted"; nothing was sent. ✅
+- [x] **5.4 Editable draft template.** "Edit draft template" below the One-click contact
+  button opens a dialog (subject + body, placeholder reference, Save / Reset to default).
+  Saved per-account and used for every future one-click draft until changed. Placeholders:
+  `{{company}}`, `{{fit_reason}}` (one-line active-thesis rationale, empty if unscored),
+  `{{sender}}`. Stored in Supabase auth user_metadata (`outreach_template`) — deliberately
+  NOT a new table, so the feature needed no additional manual migration.
+  `lib/outreach-template.ts` (defaults/validation/rendering, client-safe),
+  `app/api/outreach/template/route.ts` (GET/PUT/DELETE), editor UI in
+  `components/one-click-contact.tsx`.
+  **Done:** a saved custom template (verified with unicode + em dash) drives the next
+  draft's subject and body; reset returns to the default. ✅ (API + draft round-trip
+  verified live; the dialog itself is a visual-only remaining check.)
 
 ### Tier 6 — Polish & video
 Gate: nothing crashes on camera; video recorded with buffer.
