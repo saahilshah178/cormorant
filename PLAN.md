@@ -80,7 +80,7 @@ no "just one more hour."
   agent run as a durable background pipeline (survives closing the tab), adding newly scored
   companies on top of the preset set. This is the actual ongoing-deal-flow product, not just a
   demo trick — but it still builds after Tiers 0–3 and is the first tier cut if time runs short.
-- Tier 5 — Outreach + Calendly + calendar population. (CUT FIRST if behind)
+- Tier 5 — One-click contact: a pre-filled Gmail draft to the founder. (CUT FIRST if behind)
 - Tier 6 — Polish, error states, seed data, demo script, video.
 
 ---
@@ -171,8 +171,15 @@ anything needs enabling in the dashboard for it to run there.
   traction | press | other), value, source_url, confidence (0–1), extracted_at
 - `scores`: id, company_id, thesis_id, fit_score (0–100), confidence (0–1),
   fit_rationale (text), pass_reason (text), contributing_signal_ids[], scored_at
-- `outreach` (Tier 5 only): id, company_id, status (not_contacted | contacted | responded |
-  booked | needs_info), scheduled_at, notes
+- `outreach` (Tier 5 only): id, company_id, user_id, status (not_contacted | drafted),
+  founder_email, gmail_draft_id, drafted_at, notes. *(The init migration created the original
+  Calendly-era shape — contacted/responded/booked/needs_info statuses plus `scheduled_at`;
+  Tier 5 ships an ALTER migration to this shape when it is built. The Tier 0 "no re-migration
+  later" claim for this table no longer holds — superseded by the 2026-07-19 Tier 5 scope
+  revision.)*
+- `gmail_tokens` (Tier 5 only): user_id (pk), access_token, refresh_token, expires_at,
+  updated_at — the signed-in VC's Google provider tokens (gmail.compose scope), captured
+  server-side at the OAuth callback; deny-all RLS, service-role access only.
 - `discovery_runs` (Tier 4 only): id, mode (text — retained in the schema but always `batch`
   since continuous mode was removed), target_count (int — how many companies the run finds),
   status (running | stopped | completed | failed), workflow_run_id (text, the Workflow DevKit
@@ -279,7 +286,8 @@ Built (`npm run build` and `npm run lint` both green):
 - `lib/models.ts` — pins the two model ids (`reasoning`/`cheap`) and the OpenAI provider.
 - `lib/supabase.ts` — server-only admin client (lazy; throws a clear error if env is unset).
 - `supabase/migrations/20260718120000_init.sql` — the full §3 schema (incl. the Tier 5
-  `outreach` table, so no re-migration later). `app/api/db-check/route.ts` is a **temporary**
+  `outreach` table — though the 2026-07-19 Tier 5 scope revision re-shapes it after all;
+  see §3). `app/api/db-check/route.ts` is a **temporary**
   insert+read-back round-trip route (idempotent) — delete it once 0.3 is confirmed live.
 - Installed deps: `ai@7`, `@ai-sdk/react@4`, `@ai-sdk/openai@4` (majors intentionally differ,
   per §2), `@supabase/supabase-js@2`. `.env.example` documents the three vars.
@@ -737,14 +745,102 @@ were deleted afterwards to restore the pristine 43-company seed pool. Committing
 project (used by preview + prod), so no further DB step is needed on merge. `npm run build`
 and `npm run lint` green.
 
-### Tier 5 — Outreach + Calendly (CUT FIRST IF BEHIND)
-Gate: a one-button flow updates status end to end.
+### Tier 5 — One-click contact (Gmail draft outreach) (CUT FIRST IF BEHIND)
+Gate: clicking "One-click contact" at the bottom of a company report creates a draft in the
+signed-in VC's own Gmail — the founder's email in To:, subject and a short
+when-are-you-free-to-meet body pre-filled — and the draft is visible in Gmail's Drafts
+folder, ready for the VC to send from Gmail themselves. The app never sends anything.
 
-- [ ] **5.1 Reach-out flow.** Button on CompanyReport → `outreach` row, status → contacted;
-  Calendly scheduling link; on booking (test account only), write `scheduled_at`, status →
-  booked; node color/state reflects status; simple upcoming-calls list.
-  **Done:** the full status lifecycle is visible on the map without sending anything to real
-  people.
+**Scope revision (2026-07-19):** the original Calendly/calendar scope is dropped entirely —
+no scheduling links, no booking webhook, no `scheduled_at`, no upcoming-calls list. The flow
+is deliberately smaller: the app *drafts*, the VC *sends from their own Gmail*. This also
+keeps the §1 "no real outbound messages during judging" rule structurally true — a draft
+sitting in Drafts sends nothing. The `outreach` table is re-shaped accordingly (see §3).
+
+**Status — TIER 5 BUILT, CODE-COMPLETE, PARTIALLY GATE-VERIFIED (2026-07-19).**
+`npm run build` and `npm run lint` green. What is verified vs. what still needs two manual
+dashboard steps (which no autonomous session can do — same class as every prior migration):
+
+Verified end-to-end in a headless browser (localhost, real DB, magic-link QA session):
+- The "One-click contact" button renders at the bottom of the company report (board dialog;
+  the map panel shares the component).
+- Click → `POST /api/outreach/contact` → with no Gmail tokens on file the route returns the
+  typed `gmail_reauth_required` 401 and the UI swaps to the "Connect Gmail to draft
+  outreach" state with an explainer — the graceful-degradation path of 5.1, working.
+- The Connect Gmail button → Supabase OAuth → lands on accounts.google.com with EXACTLY
+  `scope=email profile https://www.googleapis.com/auth/gmail.compose`,
+  `access_type=offline`, `prompt=consent` — the 5.1 scope/offline wiring, verified live.
+- `/api/outreach` GET degrades to `not_contacted` while the migration is unapplied; no 500s.
+- QA artifacts (throwaway user, thesis, 3 scores) deleted afterwards; seed pool pristine.
+
+Remaining MANUAL steps to light it up fully (blocked for an agent: the Supabase dashboard
+session and Google account are the user's; an autonomous run was correctly denied both):
+1. Supabase dashboard → SQL Editor → run
+   `supabase/migrations/20260719160000_outreach_contact.sql` (re-shapes `outreach`, creates
+   `gmail_tokens` — see §3).
+2. Google Cloud console (same project as the OAuth client) → enable the **Gmail API**
+   (APIs & Services → Library → Gmail API → Enable).
+3. Sign out, sign back in with Google once (the consent screen now asks for Gmail
+   draft access) — the callback stores the provider tokens; then One-click contact
+   creates real drafts. Optionally put the OAuth client id/secret in env as
+   `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (see `.env.example`) for silent token
+   refresh after the first hour; without them the UI offers re-consent when needed.
+
+Implementation notes:
+- `lib/gmail.ts` — provider-token store + refresh + `drafts.create` (RFC 2822 MIME,
+  base64url). Typed failures: `GmailAuthError` → UI re-consent; `GmailApiDisabledError` →
+  actionable "enable the Gmail API" message. The app can only CREATE drafts
+  (gmail.compose); nothing is ever sent.
+- `lib/gmail-scope.ts` — client-safe scope + `access_type=offline`/`prompt=consent`
+  constants shared by the sign-in button and the re-consent button.
+- `app/auth/callback/route.ts` — captures `provider_token`/`provider_refresh_token` at the
+  one moment Supabase surfaces them (the code exchange; Supabase does NOT refresh provider
+  tokens itself — verified against @supabase/ssr behavior). Best-effort: sign-in never
+  fails on token capture.
+- `lib/founder-email.ts` (5.2) — homepage + up to two same-host contact/about/team pages,
+  browser-UA fetch (8s timeouts), mailto+regex harvest, junk filter, heuristic ranking
+  (company-domain first, hello@/founders@ over press@), cheap-model tiebreak CONSTRAINED to
+  the harvested list (code-enforced — an address is never invented). None found → draft
+  still created with To: blank and the UI says so (the honest empty state).
+- `app/api/outreach/contact/route.ts` (5.3) — auth-gated; company visibility check (shared
+  pool or own discoveries, per the per-user amendment); idempotent (already-drafted returns
+  the existing draft); Gmail auth checked BEFORE any website fetching; the one-line
+  fit-rationale excerpt from the active thesis's score personalizes the body; upsert on
+  `(company_id, user_id)`.
+- `app/api/outreach/route.ts` — GET drafted-state for the report UI.
+- `components/one-click-contact.tsx` — button / drafting / drafted ("waiting in your
+  Gmail" + open-drafts link) / re-consent / error states; keyed by company id in
+  `company-report.tsx` so the panel's in-place company swaps reset it.
+- Migration `supabase/migrations/20260719160000_outreach_contact.sql` — §3 re-shape +
+  `gmail_tokens`, RLS enabled on both (service-role bypasses; deny-all default).
+
+- [ ] **5.1 Gmail authorization.** Extend the existing Google sign-in (Supabase Auth) to
+  request the `gmail.compose` scope and capture the Google provider token server-side.
+  Verify at build time how Supabase surfaces `provider_token` / `provider_refresh_token`
+  (Supabase does not refresh provider tokens itself; expect to need `access_type=offline` +
+  `prompt=consent` query params on `signInWithOAuth`, or an incremental re-consent triggered
+  the first time the button is clicked). Also requires enabling the Gmail API in the same
+  Google Cloud project as the existing OAuth client. Pre-existing sessions must degrade
+  gracefully: the button explains "re-sign in to connect Gmail" rather than erroring.
+  **Done:** a server route can mint a valid Gmail API access token for the signed-in user.
+  **Verify:** that route lists the user's drafts (or `users.getProfile`) and gets a 200.
+- [ ] **5.2 Founder email resolution.** Best-effort founder/contact email per company: cheap-
+  model extraction over the company's own website (contact/about/footer pages), cached on the
+  `outreach` row (`founder_email`). If no public address is found, the draft is still created
+  with To: left blank and the UI says so honestly ("no public email found — add the recipient
+  in Gmail") — never invent or guess an address.
+  **Done:** contact on a company with a public email fills To:; one without shows the honest
+  empty state and still produces an editable draft.
+- [ ] **5.3 One-click contact button + draft creation.** "One-click contact" button at the
+  bottom of `CompanyReport` (the map slide-in panel and the board dialog share the component,
+  so both get it). Server route: resolve the email (5.2) → Gmail `users.drafts.create` (RFC
+  2822 MIME message: To, Subject, short personalized body — company name, one line of why
+  they're a fit, and the ask: when are you free to meet?) → upsert the `outreach` row
+  (status `drafted`, founder_email, gmail_draft_id, drafted_at, user_id) → ship the §3 ALTER
+  migration. Once a draft exists the report shows a "Drafted" state (with a link out to
+  Gmail Drafts) instead of the button.
+  **Done (tier gate):** click the button → open Gmail → the draft sits in Drafts addressed
+  to the founder with subject and body; the report shows "Drafted"; nothing was sent.
 
 ### Tier 6 — Polish & video
 Gate: nothing crashes on camera; video recorded with buffer.
@@ -771,7 +867,9 @@ Gate: nothing crashes on camera; video recorded with buffer.
    panel); new company nodes drop in and score on camera while the rest of the demo continues.
 4. Click the standout company: strong cited fit thesis + a sharp, specific pass reason.
 5. Swap to a second thesis; the same pool visibly reorders.
-6. (Tier 5, only if built) one-click reach out; node flips to "contacted".
+6. (Tier 5, only if built) one-click contact on the standout company; cut to Gmail — the
+   draft is sitting in Drafts, addressed to the founder, asking when they're free to meet;
+   back in the app the report now shows "Drafted". Nothing is sent on camera.
 
 Everything in this sequence must work on seed data alone, so a dead network never kills the demo.
 
