@@ -120,7 +120,8 @@ function TemplateEditor({
             <DialogTitle>Draft template</DialogTitle>
             <p className="text-muted-foreground mt-1 text-sm">
               Every One-click contact draft uses this template until you change
-              it. It saves to your account.
+              it. It saves to your account. Drafts already sitting in Gmail
+              aren&apos;t changed.
             </p>
           </div>
 
