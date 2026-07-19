@@ -6,24 +6,19 @@ import ForceGraph2D, {
   type LinkObject,
   type NodeObject,
 } from "react-force-graph-2d";
-import { forceCollide, forceX, forceY } from "d3-force";
+import { forceCollide, forceRadial } from "d3-force";
 import { sectorColor } from "@/lib/sectors";
-import { anchorX, anchorY, radiusForFit } from "@/lib/graph-layout";
+import { radiusForFit } from "@/lib/graph-layout";
 
 /**
  * Direct react-force-graph-2d wrapper (PLAN.md stack gotcha: refs break
  * through next/dynamic, so this client component imports the lib directly and
  * holds the ref internally; deal-map.tsx dynamic()s THIS file with ssr:false).
  *
- * Layout: every node is ANCHORED (forceX/forceY) toward a deterministic target
- * — radius from its fit score (high fit → center), angle from its fixed slot.
- * This is the anti-clustering fix: a bare forceRadial only fixes distance from
- * center, so nodes float freely around the ring and any reheat (a click, a poll,
- * a stray drag) can slide them all onto one side. Anchoring each node to a
- * unique slot makes that structurally impossible while still letting fit changes
- * animate (only the target radius moves). Every node is the same fixed size;
- * color = sector, label = name (drawn always — identity is never color-alone).
- * Charge and link forces stay weak so they only add gentle spacing, not drift.
+ * Layout: forceRadial pulls each node to a radius set by its fit score (high
+ * fit → center). Every node is the same fixed size; color = sector, label =
+ * name (drawn always — identity is never color-alone). Charge and link forces
+ * are weakened so they don't fight the radial layout.
  */
 
 export type GraphNode = {
@@ -32,7 +27,6 @@ export type GraphNode = {
   sector: string | null;
   fit: number; // 0–100
   confidence: number; // 0–1
-  slot: number; // stable index → fixed angle (see lib/graph-layout)
 };
 
 export type GraphLink = {
@@ -68,40 +62,29 @@ export default function GraphWrapper({
   );
   const hasAutoFitted = useRef(false);
 
-  // (Re)configure forces whenever the data changes, then reheat: the anchor
-  // forces read node.fit/node.slot live, so after a thesis swap mutates fits, a
-  // reheat is all the nodes need to glide to their new radii along their fixed
-  // angles. Start positions are seeded by the node-cache owner (DealflowView)
-  // when a node is first created, so this effect never mutates the node objects
-  // it's handed.
+  // (Re)configure forces whenever the data changes, then reheat: the radial
+  // force reads node.fit live, so after a thesis swap mutates fits, a reheat is
+  // all the nodes need to animate to their new radii. Start positions are seeded
+  // by the node-cache owner (DealflowView) when a node is first created, so this
+  // effect never mutates the node objects it's handed.
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
     fg.d3Force("center", null);
-    // Drop any radial force a previous build may have installed on this ref.
-    fg.d3Force("radial", null);
     fg.d3Force("charge")?.strength?.(-25);
     const link = fg.d3Force("link");
     link?.strength?.(0.02);
     link?.distance?.(60);
-    // Anchor each node toward its deterministic target (radius = f(fit), angle =
-    // f(slot)). Unlike a free radial ring, this fixes BOTH coordinates, so the
-    // pool can't slide into a one-sided cluster on any reheat. Strength ~0.5
-    // keeps nodes on their slots while charge/collide add a little organic play.
     fg.d3Force(
-      "x",
-      forceX<NodeObject<GraphNode>>((node) =>
-        anchorX(node.slot ?? 0, node.fit ?? 0),
-      ).strength(0.5) as never,
+      "radial",
+      forceRadial<NodeObject<GraphNode>>(
+        (node) => radiusForFit(node.fit ?? 0),
+        0,
+        0,
+      ).strength(0.85) as never,
     );
-    fg.d3Force(
-      "y",
-      forceY<NodeObject<GraphNode>>((node) =>
-        anchorY(node.slot ?? 0, node.fit ?? 0),
-      ).strength(0.5) as never,
-    );
-    // Keeps nodes from stacking on top of each other so every one stays
-    // individually clickable.
+    // Keeps same-fit nodes from stacking on top of each other so every node
+    // stays individually clickable.
     fg.d3Force(
       "collide",
       forceCollide<NodeObject<GraphNode>>(NODE_R + 6).strength(0.9) as never,

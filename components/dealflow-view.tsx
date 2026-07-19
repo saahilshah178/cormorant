@@ -75,16 +75,12 @@ export function DealflowView({
         sector: c.sector,
         fit: c.fit_score,
         confidence: c.confidence,
-        // Stable slot = cache size at creation: a monotonic index across every
-        // node ever created. It fixes this node's angle for the life of the
-        // session, so the graph anchors the whole pool to evenly-fanned slots
-        // and new nodes never pile onto one arc.
-        slot: nodeCache.current.size,
       };
-      // Seed the node ON its anchor target so it appears in place instead of
-      // flying in from the center. Only brand-new nodes are seeded; cached ones
-      // keep their settled positions.
-      seedNodePosition(created);
+      // Seed a fanned-out start position on this node's fit ring. The cache size
+      // is a monotonic index across every node ever created, so the whole pool
+      // stays evenly distributed instead of new nodes piling onto one arc. Only
+      // brand-new nodes are seeded; cached ones keep their settled positions.
+      seedNodePosition(created, nodeCache.current.size);
       nodeCache.current.set(c.id, created);
       return created;
     });
