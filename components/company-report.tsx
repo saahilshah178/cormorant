@@ -1,5 +1,6 @@
 import { ExternalLinkIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { OneClickContact } from "@/components/one-click-contact";
 import { sectorColor, sectorLabel } from "@/lib/sectors";
 import type { DealflowCompany, DealflowSignal } from "@/lib/dealflow";
 import { cn } from "@/lib/utils";
@@ -169,6 +170,14 @@ export function CompanyReport({ company }: { company: DealflowCompany }) {
             didn’t drive this score.
           </p>
         )}
+      </section>
+
+      <section className="border-border/70 border-t pt-4">
+        <OneClickContact
+          key={company.id}
+          companyId={company.id}
+          companyName={company.name}
+        />
       </section>
     </article>
   );
