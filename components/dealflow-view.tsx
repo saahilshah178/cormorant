@@ -36,6 +36,10 @@ export function DealflowView({
   const [view, setView] = useState<"map" | "board">("map");
   const [running, setRunning] = useState(false);
   const [runSummary, setRunSummary] = useState<string | null>(null);
+  // Id of a thesis that was just edited (its scores were cleared server-side,
+  // so its map is stale until rescored). The prompt shows only while this
+  // matches the thesis on screen, so switching thesis hides it automatically.
+  const [rescoreThesisId, setRescoreThesisId] = useState<string | null>(null);
 
   // Node objects are cached by company id and MUTATED on refetch, so the
   // force simulation keeps positions across polls and thesis swaps — that's
@@ -92,10 +96,25 @@ export function DealflowView({
     };
   }, [fetchData]);
 
+  // Prompt a rescore when a thesis is edited elsewhere (the header Thesis menu).
+  // The edit already cleared that thesis's scores server-side, so its map is
+  // stale until rescored; the banner renders only while the edited id is the
+  // one on screen (see rescoreThesisId).
+  useEffect(() => {
+    function onThesisUpdated(event: Event) {
+      const id = (event as CustomEvent<{ id: string }>).detail?.id;
+      if (id) setRescoreThesisId(id);
+    }
+    window.addEventListener("cormorant:thesis-updated", onThesisUpdated);
+    return () =>
+      window.removeEventListener("cormorant:thesis-updated", onThesisUpdated);
+  }, []);
+
   const runScoring = useCallback(async () => {
     setRunning(true);
     setRunSummary(null);
     setError(null);
+    setRescoreThesisId(null);
     const poll = setInterval(() => {
       fetchData().catch(() => {}); // transient poll errors are fine
     }, 2500);
@@ -178,6 +197,18 @@ export function DealflowView({
           </div>
         </div>
       </div>
+
+      {rescoreThesisId === thesisId && !running && (
+        <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <span className="text-amber-900 dark:text-amber-200">
+            This thesis changed. Rerun scoring to update the deal flow against
+            the edited thesis.
+          </span>
+          <Button size="sm" onClick={runScoring}>
+            <PlayIcon /> Rerun scoring
+          </Button>
+        </div>
+      )}
 
       {error && (
         <div className="border-destructive/40 bg-destructive/5 text-destructive mx-6 mt-4 rounded-lg border p-3 text-sm">

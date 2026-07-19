@@ -39,6 +39,16 @@ export function ThesisForm({
   useEffect(() => {
     if (wasPending.current && !pending && !state.error && thesis) {
       onSaved?.();
+      // Editing a thesis clears its cached scores server-side; tell the open
+      // deal-flow view so it can prompt a rescore (the two live in separate
+      // React trees — the header vs. the page — so a window event bridges them).
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("cormorant:thesis-updated", {
+            detail: { id: thesis.id },
+          }),
+        );
+      }
     }
     wasPending.current = pending;
   }, [pending, state.error, thesis, onSaved]);
