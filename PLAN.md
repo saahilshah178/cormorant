@@ -56,7 +56,8 @@ account. Fixed by scoping companies and discovery per-user while keeping the see
 - `scores` still partition per-user through `thesis_id` (theses are per-user) — no new column.
 - `discovery_instructions` and `discovery_runs` gained `user_id`; the instructions/start/status/
   stop/stream routes and the pipeline now filter by it. The "one run at a time" lock is now
-  per-user, and Stop/stream enforce ownership.
+  per-user, and Stop/stream enforce ownership. *(The `discovery_instructions` table and its
+  route were later removed outright — 2026-07-18 Tier 4 cleanup Update.)*
 - RLS was enabled on all four tables as defense-in-depth (the service-role client still bypasses
   it; app-level `user_id` filters remain the real enforcement, same as `theses`).
 
@@ -105,7 +106,8 @@ no "just one more hour."
 - Discovery pipeline (Tier 4): a multi-agent pipeline — parallel scraper agents over a fixed
   source list (YC directory, Product Hunt launches, HN Show/Launches, GitHub trending,
   Wellfound) plus a search-API agent (Exa or Tavily — pick whichever key is fastest to get)
-  for a secondary broaden-the-net pass, a review agent that dedupes/validates/extracts
+  for a secondary broaden-the-net pass and a funding-news agent (TechCrunch keyless search)
+  for later-stage supply, a review agent that dedupes/validates/extracts
   signals, and a grading agent that reuses `scoreCompany` (section 5) as-is. Orchestrated with
   **Vercel Workflow DevKit** (`workflow` + `@workflow/next` + `@workflow/ai`) so a run is a
   true durable background job — it keeps running server-side even if the VC closes the tab —
@@ -176,10 +178,10 @@ anything needs enabling in the dashboard for it to run there.
   status (running | stopped | completed | failed), workflow_run_id (text, the Workflow DevKit
   run id — used to reattach/stream/cancel after a page reload), thesis_id, companies_found
   (int, default 0), started_at, stopped_at
-- `discovery_instructions` (Tier 4 only): id, text, active (bool, default true), created_at —
-  persistent free-text guidance the VC gives the discovery agents (e.g. "prioritize fintech
-  infra, avoid consumer social"); every active row is concatenated into the scraper/review/
-  grading prompts on every future run
+
+(A `discovery_instructions` table existed briefly — persistent free-text guidance fed to the
+agents — and was removed 2026-07-18: discovery is steered by the active thesis alone. See the
+Tier 4 cleanup update.)
 
 Every number a VC sees must trace back to rows in `signals` via `contributing_signal_ids`.
 That traceability is the product. No score without its signals.
@@ -595,6 +597,37 @@ vertical on ~every third round** (`buildSearchQuery`), so the net keeps widening
 specialized companies rather than re-hitting the obvious names. `npm run build`
 (`workflows build complete (10 steps, 1 workflow)`) and `npm run lint` are green.
 
+**Update (2026-07-18, discovery cleanup): standing instructions removed + niche-criteria and
+citation fixes.** A "Series B" run returned 0/15 with the log full of `source_url 403 — not
+citable` rejects. Three fixes shipped together:
+1. **Standing `discovery_instructions` removed entirely** — discovery is steered by the active
+   thesis alone (stages, industries, free-text); the VC edits the thesis or switches to another
+   to steer a run. Removed: the panel's instructions section, `app/api/discovery/instructions/`,
+   all pipeline plumbing, and the table itself (migration
+   `supabase/migrations/20260719150000_drop_discovery_instructions.sql` — apply via the
+   dashboard SQL editor like the prior migrations).
+2. **The 403 reject flood was two real bugs, both fixed.** The review agent fetched citations
+   with a `CormorantBot/1.0` UA (403'd by pages that serve the scrapers' browser UA fine), and
+   Product Hunt post pages bot-wall EVERY server fetch (403 on all UAs and networks tried, incl.
+   the `/r/p/` redirect — verified live), so every PH candidate died in review. Review now
+   resolves evidence through a fallback chain (`resolveEvidence` in `lib/discovery/pipeline.ts`):
+   the source page (browser-like shared headers, one retry on 429/5xx) → the company's own
+   website (the citation switches to the page that was actually verified) → the source's
+   first-party feed excerpt for bot-walled sources (citation kept — the page loads for a human
+   clicking it — but signals are capped at 2 with confidence ≤ 0.4, enforced in code, so thin
+   evidence reads as "Speculative" downstream). A 404/410 or a page that doesn't mention the
+   company still rejects outright.
+3. **Later-stage / niche supply.** Every fixed source is launch-oriented (recent YC batches,
+   Show/Launch HN, PH, new GitHub repos), so a Series A/B thesis had near-zero supply. Added a
+   funding-news scraper — TechCrunch's keyless WordPress REST search (`news` SourceKey in
+   `lib/discovery/sources.ts`; VentureBeat and Finsmes bot-wall theirs, verified 2026-07-18) —
+   queried each round from the thesis's industries × stages. Queries now use the human labels
+   ("Fintech Series B"), not raw slugs (`series_b`) — the old search queries were built from
+   slugs, which are bad search terms. Triage is now stage-aware (skips hobby demos for
+   late-stage theses and established companies for pre-seed ones). Verified live: "Fintech
+   Series B" → 20 real candidates (Sarvam, Equal AI, Moment Energy, …) with fetchable
+   TechCrunch citations. `npm run build` and `npm run lint` green.
+
 Implementation notes:
 - Deps added: `workflow@4` + `@workflow/next@4` (per §2). NOT `@workflow/ai` — its
   `DurableAgent` peers on `ai@^6` and this repo is on `ai@7`, so the scraper/review/grading
@@ -618,14 +651,18 @@ Implementation notes:
   when `EXA_API_KEY`/`TAVILY_API_KEY` is set, else a **keyless HN full-text search + GitHub
   repo search** fallback (two different populations) so the pass still runs with zero extra
   signups (documented deviation from §2's "Exa or Tavily" — no key was provisioned; drop one
-  in for still wider reach).
+  in for still wider reach). Funding news (`news`) via **TechCrunch's keyless WordPress REST
+  search** — the pass that gives later-stage (Series A/B) and niche theses real supply, since
+  every other source is launch-oriented (added in the 2026-07-18 discovery cleanup).
 - `lib/discovery/pipeline.ts` (4.3) — the `discoveryWorkflow` orchestrator. Per round:
-  parallel `scrapeSource` steps (5 fixed sources + search, each reading the thesis + active
-  `discovery_instructions`; the cheap model triages raw mentions down to the few worth
+  parallel `scrapeSource` steps (5 fixed sources + the query-driven search and news agents,
+  each steered by the thesis; the cheap, stage-aware model triage picks the few worth
   reviewing) → parallel `reviewCandidate` steps (dedupe by normalized name/domain against
-  existing `companies`, **fetch the source_url and reject if it 4xx/5xx or doesn't mention the
-  company** — the citation is verified, not assumed; extract ≤4 structured signals with the
-  cheap model, grounded only in the fetched page text; reject anything with no citable signal)
+  existing `companies`; **verify the citation via the `resolveEvidence` fallback chain** —
+  source page → company website → first-party feed excerpt for bot-walled sources
+  (confidence-capped) — rejecting 404s and pages that don't mention the company; extract ≤4
+  structured signals with the cheap model, grounded only in the verified evidence text;
+  reject anything with no citable signal)
   → `insertAndGrade` (insert company + signals, then the SAME Tier-2 `scoreCompany` unchanged,
   persist the score, bump `discovery_runs.companies_found`; a scoring failure **rolls the
   company back** so the map never shows an unscored ghost node). Loop control: each round
@@ -638,14 +675,12 @@ Implementation notes:
   query each round and probes a niche vertical on ~every third round. A cooperative **Stop**
   flips `discovery_runs.status`, which the loop checks between rounds. Every step catches its
   own errors and returns empty/null, so one candidate/source failing never drops inserted data.
-- API routes: `app/api/discovery/{start,stop,status,stream,instructions}/route.ts`.
+- API routes: `app/api/discovery/{start,stop,status,stream}/route.ts`.
   `start` inserts the `discovery_runs` row, `start()`s the workflow, records `workflow_run_id`
   (reattach after reload). `stop` flips DB status (cooperative — the loop checks it between
   rounds). `stream` proxies `run.getReadable({namespace})` for the per-agent logs.
-  `instructions` GET/POST/DELETE (DELETE = soft `active=false`).
 - `components/discovery-panel.tsx` (4.4) — header "Discovery" dialog: a target-count input
-  ("Companies to find"), start/stop, the standing-instructions list+box (upserts
-  `discovery_instructions`, visibly fed to every future round), and the live agent-activity log
+  ("Companies to find"), start/stop, and the live agent-activity log
   reading the three namespaced streams (`logs:scraper`/`logs:review`/`logs:grading`,
   color-coded). Polls `/api/discovery/status` while a run is live — dialog open or not — and
   calls the dealflow refetch so nodes drop onto the map as they're scored. On mount it
@@ -661,7 +696,8 @@ Implementation notes:
   applied via the dashboard SQL Editor (same manual path as Tier 0 / 1.5; no CLI link in repo).
 
 - [x] **4.1 Discovery data model.** ✅ Both tables exist (verified via PostgREST 200); a
-  hand-inserted `discovery_instructions` row was read back by id.
+  hand-inserted `discovery_instructions` row was read back by id. *(That table was dropped in
+  the 2026-07-18 cleanup — see the Update above; `discovery_runs` is the one that remains.)*
 - [x] **4.2 Source integrations.** ✅ Standalone run: YC 50, Product Hunt 25, HN 25, GitHub 25,
   search (keyless HN fallback) 11 real candidates each, with real source URLs. Wellfound 0
   (DataDome 403 — implemented, degrades gracefully, documented above).
@@ -674,8 +710,8 @@ Implementation notes:
   integrity):** across all runs, zero duplicate company names (name/domain dedupe + a live
   last-line DB check hold); grading-failure rollback keeps unscored ghosts off the map.
 - [x] **4.4 Discovery settings UI.** ✅ Panel verified in a headless browser:
-  target input, start/stop, standing-instructions list (the persisted "prioritize AI infra and
-  devtools" row shows and is fed to the agents), and the live color-coded activity log replaying
+  target input, start/stop, the standing-instructions list *(feature since removed — see the
+  2026-07-18 cleanup Update)*, and the live color-coded activity log replaying
   all three namespaced streams (scraper source counts + triage picks, review dedupe/citation
   rejections, grading scores). Reattaches to the last run on reload.
 - [x] **4.5 Map integration.** ✅ Discovered companies render as radial nodes (sector color,
