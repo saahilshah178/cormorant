@@ -2,5 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "next build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "regions": ["iad1"],
+  "functions": {
+    "app/api/discovery/stream/route.ts": {
+      "maxDuration": 300,
+      "supportsCancellation": true
+    },
+    "app/api/score/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DealBoard } from "@/components/deal-board";
 import { DealMap } from "@/components/deal-map";
+import { DiscoveryPanel } from "@/components/discovery-panel";
 import type { DealflowPayload } from "@/lib/dealflow";
 import type { GraphLink, GraphNode } from "@/components/graph-wrapper";
 import { cn } from "@/lib/utils";
@@ -144,6 +145,7 @@ export function DealflowView({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <DiscoveryPanel onRefresh={fetchData} />
           <Button size="sm" onClick={runScoring} disabled={running}>
             {running ? (
               <Loader2Icon className="animate-spin" />
