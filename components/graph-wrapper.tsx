@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import ForceGraph2D, {
   type ForceGraphMethods,
   type LinkObject,
@@ -8,6 +8,7 @@ import ForceGraph2D, {
 } from "react-force-graph-2d";
 import { forceCollide, forceRadial } from "d3-force";
 import { sectorColor } from "@/lib/sectors";
+import { radiusForFit } from "@/lib/graph-layout";
 
 /**
  * Direct react-force-graph-2d wrapper (PLAN.md stack gotcha: refs break
@@ -35,22 +36,11 @@ export type GraphLink = {
   kind: "shared_signal" | "sector";
 };
 
-const MIN_R = 25;
-const MAX_R = 330;
-
 /** Every node renders at the same fixed radius (size is not a data channel). */
 const NODE_R = 6;
 
-function radiusForFit(fit: number): number {
-  const clamped = Math.max(0, Math.min(100, fit));
-  return MIN_R + (1 - clamped / 100) * (MAX_R - MIN_R);
-}
-
 /** Faint guide rings so "closer to center = higher fit" is legible. */
 const GUIDE_FITS = [80, 50, 20];
-
-/** ~137.5° — spreads sequential nodes evenly around a ring (sunflower spacing). */
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 export default function GraphWrapper({
   nodes,
@@ -71,15 +61,12 @@ export default function GraphWrapper({
     undefined,
   );
   const hasAutoFitted = useRef(false);
-  // Node ids we've already given a starting position. Each node is seeded once
-  // (overriding the library's default placement, which drops new nodes near the
-  // origin and lets them clump on one side); settled nodes keep their positions
-  // across refetches and thesis swaps so the resettle stays an animation.
-  const seededIds = useRef(new Set<string>());
 
-  // (Re)configure forces whenever the data changes: the radial force reads
-  // node.fit live, so after a thesis swap mutates fits, a reheat is all the
-  // nodes need to animate to their new radii.
+  // (Re)configure forces whenever the data changes, then reheat: the radial
+  // force reads node.fit live, so after a thesis swap mutates fits, a reheat is
+  // all the nodes need to animate to their new radii. Start positions are seeded
+  // by the node-cache owner (DealflowView) when a node is first created, so this
+  // effect never mutates the node objects it's handed.
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
@@ -102,30 +89,22 @@ export default function GraphWrapper({
       "collide",
       forceCollide<NodeObject<GraphNode>>(NODE_R + 6).strength(0.9) as never,
     );
-
-    // Seed each not-yet-seen node onto its own fit ring at a golden-angle
-    // offset, so the whole pool fans out around the circle from the first frame
-    // instead of piling onto one arc (forceRadial fixes distance, not angle).
-    let seedIndex = seededIds.current.size;
-    for (const node of nodes as NodeObject<GraphNode>[]) {
-      if (seededIds.current.has(node.id)) continue;
-      const r = radiusForFit(node.fit ?? 0);
-      const a = seedIndex * GOLDEN_ANGLE;
-      node.x = Math.cos(a) * r;
-      node.y = Math.sin(a) * r;
-      node.vx = 0;
-      node.vy = 0;
-      seededIds.current.add(node.id);
-      seedIndex++;
-    }
-
     fg.d3ReheatSimulation();
   }, [nodes, links]);
+
+  // Stable graphData identity: react-force-graph reheats the simulation whenever
+  // the graphData reference changes, so an inline `{ nodes, links }` would reheat
+  // (and let the layout re-cluster) on every re-render — including a mere node
+  // selection. Only rebuild it when the data actually changes.
+  const graphData = useMemo(() => ({ nodes, links }), [nodes, links]);
 
   return (
     <ForceGraph2D<GraphNode, GraphLink>
       ref={fgRef}
-      graphData={{ nodes, links }}
+      graphData={graphData}
+      // Click-to-open-report is the only interaction; dragging would pin nodes
+      // and reheat the sim, so it stays off.
+      enableNodeDrag={false}
       width={width}
       height={height}
       backgroundColor="rgba(0,0,0,0)"
