@@ -11,6 +11,7 @@ import { DealMap } from "@/components/deal-map";
 import { DiscoveryPanel } from "@/components/discovery-panel";
 import type { DealflowPayload } from "@/lib/dealflow";
 import type { GraphLink, GraphNode } from "@/components/graph-wrapper";
+import { seedNodePosition } from "@/lib/graph-layout";
 import { cn } from "@/lib/utils";
 
 /**
@@ -75,6 +76,11 @@ export function DealflowView({
         fit: c.fit_score,
         confidence: c.confidence,
       };
+      // Seed a fanned-out start position on this node's fit ring. The cache size
+      // is a monotonic index across every node ever created, so the whole pool
+      // stays evenly distributed instead of new nodes piling onto one arc. Only
+      // brand-new nodes are seeded; cached ones keep their settled positions.
+      seedNodePosition(created, nodeCache.current.size);
       nodeCache.current.set(c.id, created);
       return created;
     });
