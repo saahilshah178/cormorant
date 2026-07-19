@@ -47,34 +47,39 @@ export function ThesisForm({
     <form action={formAction} className="flex flex-col gap-6">
       {thesis ? <input type="hidden" name="id" value={thesis.id} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5 text-sm font-medium">
-          Thesis name
-          <Input
-            name="name"
-            placeholder="e.g. Pre-seed deeptech"
-            defaultValue={thesis?.name}
-            required
-            autoFocus
-          />
-        </label>
+      <label className="flex flex-col gap-1.5 text-sm font-medium">
+        Thesis name
+        <Input
+          name="name"
+          placeholder="e.g. Pre-seed deeptech"
+          defaultValue={thesis?.name}
+          required
+          autoFocus
+        />
+      </label>
 
-        <label className="flex flex-col gap-1.5 text-sm font-medium">
-          Stage
-          <select
-            name="stage"
-            required
-            defaultValue={thesis?.stage ?? STAGES[0]}
-            className="border-input h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {STAGE_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-sm font-medium">Stages</legend>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+          {STAGES.map((s) => (
+            <label
+              key={s}
+              className="flex cursor-pointer items-center gap-2 text-sm"
+            >
+              <input
+                type="checkbox"
+                name="stages"
+                value={s}
+                defaultChecked={
+                  thesis ? thesis.stages.includes(s) : s === STAGES[0]
+                }
+                className="accent-primary size-4"
+              />
+              {STAGE_LABELS[s]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-medium">Industries</legend>

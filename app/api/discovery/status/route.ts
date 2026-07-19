@@ -15,6 +15,7 @@ export async function GET() {
   const { data, error } = await getSupabaseAdmin()
     .from("discovery_runs")
     .select("*")
+    .eq("user_id", user.id)
     .order("started_at", { ascending: false })
     .limit(1);
   if (error) {

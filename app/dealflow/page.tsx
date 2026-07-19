@@ -1,9 +1,7 @@
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { redirect } from "next/navigation";
 import { DealflowView } from "@/components/dealflow-view";
 import { getActiveThesis } from "@/lib/theses";
 import { getCurrentUser } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 
 /**
  * The deal-flow screen (PLAN.md Tier 3). Server component: resolves the
@@ -35,22 +33,10 @@ export default async function DealflowPage() {
     );
   }
 
+  // New users (and anyone who deleted all their theses) go straight to
+  // onboarding rather than landing on an empty deal flow.
   if (!thesis) {
-    return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-start justify-center px-6 py-16">
-        <h1 className="text-xl font-semibold">First, describe your thesis</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Every score in Cormorant is fit-to-thesis, so the deal flow needs a
-          thesis before it can rank anything. It takes about 15 seconds.
-        </p>
-        <Link
-          href="/onboarding"
-          className={cn(buttonVariants({ size: "lg" }), "mt-6")}
-        >
-          Describe your thesis
-        </Link>
-      </main>
-    );
+    redirect("/onboarding");
   }
 
   return (

@@ -66,7 +66,7 @@ const SYSTEM_PROMPT = `You are the scoring engine of Cormorant, a VC deal-flow s
 You receive one investment thesis and one company with its extracted signals. You output a strict JSON assessment of FIT TO THAT THESIS.
 
 Rules:
-- Score fit to the thesis, never generic "goodness" or hype. A brilliant Series B consumer app scores LOW against a pre-seed deeptech thesis: wrong stage and wrong sector are disqualifying, not minor deductions. A company squarely inside the thesis's stage and industries with on-thesis traction scores high.
+- Score fit to the thesis, never generic "goodness" or hype. A brilliant Series B consumer app scores LOW against a pre-seed deeptech thesis: wrong stage and wrong sector are disqualifying, not minor deductions. The thesis's "stages" is the SET of stages it invests in — a company whose stage is not in that set is off-stage; a company at any stage in the set is on-stage. A company squarely inside the thesis's stages and industries with on-thesis traction scores high.
 - fit_score calibration: 80-100 squarely on-thesis with strong supporting evidence; 55-79 on-thesis with gaps or thin evidence; 30-54 partial fit (right sector wrong stage, or vice versa); 0-29 off-thesis.
 - confidence reflects the EVIDENCE BASE ONLY: how many independent signals exist, their source quality, and their own confidence values. Two thin signals => low confidence (≤0.4) even if the fit looks great. Five-plus corroborating signals from solid sources => high confidence (≥0.75).
 - fit_rationale must reference the actual signal contents (funding amounts, metrics, names), not vague impressions.
@@ -83,7 +83,7 @@ function buildPrompt(
     JSON.stringify(
       {
         name: thesis.name,
-        stage: thesis.stage,
+        stages: thesis.stages,
         industries: thesis.industries,
         min_traction: thesis.min_traction,
         demographics_pref: thesis.demographics_pref,

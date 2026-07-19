@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     .from("discovery_runs")
     .select("id, status")
     .eq("id", body.runId)
+    .eq("user_id", user.id)
     .maybeSingle();
   if (!run) {
     return NextResponse.json({ error: "Run not found." }, { status: 404 });

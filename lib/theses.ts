@@ -64,7 +64,8 @@ export async function updateThesis(
   input: ThesisInput,
   userId: string,
 ): Promise<Thesis> {
-  const { data, error } = await getSupabaseAdmin()
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
     .from("theses")
     .update(input)
     .eq("id", id)
@@ -72,6 +73,21 @@ export async function updateThesis(
     .select("*")
     .single();
   if (error) throw new Error(`updateThesis failed: ${error.message}`);
+
+  // Editing a thesis changes what "fit" means, so every cached score for it is
+  // now stale. `scores` are cached per (company, thesis_id) and the id doesn't
+  // change on edit, so without this the scoring route would treat them as
+  // already-scored and skip re-scoring — the edit would never reach the map.
+  // Drop them here so the next scoring run recomputes against the new thesis.
+  const { error: scoresErr } = await db
+    .from("scores")
+    .delete()
+    .eq("thesis_id", id);
+  if (scoresErr)
+    throw new Error(
+      `updateThesis: clearing stale scores failed: ${scoresErr.message}`,
+    );
+
   return data as Thesis;
 }
 

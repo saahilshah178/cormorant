@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    return NextResponse.json(await getDealflow(thesis));
+    return NextResponse.json(await getDealflow(thesis, user.id));
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

@@ -146,7 +146,10 @@ function buildEdges(companies: DealflowCompany[]): DealflowEdge[] {
   return edges;
 }
 
-export async function getDealflow(thesis: Thesis): Promise<DealflowPayload> {
+export async function getDealflow(
+  thesis: Thesis,
+  userId: string,
+): Promise<DealflowPayload> {
   const db = getSupabaseAdmin();
 
   const [scoresRes, countRes] = await Promise.all([
@@ -157,10 +160,13 @@ export async function getDealflow(thesis: Thesis): Promise<DealflowPayload> {
       )
       .eq("thesis_id", thesis.id)
       .order("fit_score", { ascending: false }),
+    // Total pool this VC could score: shared seed set (user_id IS NULL) plus
+    // their own discovered companies.
     db
       .from("companies")
       .select("id", { count: "exact", head: true })
-      .neq("source", "tier0-db-check"),
+      .neq("source", "tier0-db-check")
+      .or(`user_id.is.null,user_id.eq.${userId}`),
   ]);
   if (scoresRes.error)
     throw new Error(`getDealflow scores failed: ${scoresRes.error.message}`);

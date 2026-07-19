@@ -15,9 +15,9 @@ import { sectorColor } from "@/lib/sectors";
  * holds the ref internally; deal-map.tsx dynamic()s THIS file with ssr:false).
  *
  * Layout: forceRadial pulls each node to a radius set by its fit score (high
- * fit → center). Node size = confidence, color = sector, label = name (drawn
- * always — identity is never color-alone). Charge and link forces are
- * weakened so they don't fight the radial layout.
+ * fit → center). Every node is the same fixed size; color = sector, label =
+ * name (drawn always — identity is never color-alone). Charge and link forces
+ * are weakened so they don't fight the radial layout.
  */
 
 export type GraphNode = {
@@ -38,6 +38,9 @@ export type GraphLink = {
 const MIN_R = 25;
 const MAX_R = 330;
 
+/** Every node renders at the same fixed radius (size is not a data channel). */
+const NODE_R = 6;
+
 function radiusForFit(fit: number): number {
   const clamped = Math.max(0, Math.min(100, fit));
   return MIN_R + (1 - clamped / 100) * (MAX_R - MIN_R);
@@ -45,6 +48,9 @@ function radiusForFit(fit: number): number {
 
 /** Faint guide rings so "closer to center = higher fit" is legible. */
 const GUIDE_FITS = [80, 50, 20];
+
+/** ~137.5° — spreads sequential nodes evenly around a ring (sunflower spacing). */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 export default function GraphWrapper({
   nodes,
@@ -65,6 +71,11 @@ export default function GraphWrapper({
     undefined,
   );
   const hasAutoFitted = useRef(false);
+  // Node ids we've already given a starting position. Each node is seeded once
+  // (overriding the library's default placement, which drops new nodes near the
+  // origin and lets them clump on one side); settled nodes keep their positions
+  // across refetches and thesis swaps so the resettle stays an animation.
+  const seededIds = useRef(new Set<string>());
 
   // (Re)configure forces whenever the data changes: the radial force reads
   // node.fit live, so after a thesis swap mutates fits, a reheat is all the
@@ -89,10 +100,25 @@ export default function GraphWrapper({
     // stays individually clickable.
     fg.d3Force(
       "collide",
-      forceCollide<NodeObject<GraphNode>>(
-        (node) => 3.5 + (node.confidence ?? 0) * 5 + 6,
-      ).strength(0.9) as never,
+      forceCollide<NodeObject<GraphNode>>(NODE_R + 6).strength(0.9) as never,
     );
+
+    // Seed each not-yet-seen node onto its own fit ring at a golden-angle
+    // offset, so the whole pool fans out around the circle from the first frame
+    // instead of piling onto one arc (forceRadial fixes distance, not angle).
+    let seedIndex = seededIds.current.size;
+    for (const node of nodes as NodeObject<GraphNode>[]) {
+      if (seededIds.current.has(node.id)) continue;
+      const r = radiusForFit(node.fit ?? 0);
+      const a = seedIndex * GOLDEN_ANGLE;
+      node.x = Math.cos(a) * r;
+      node.y = Math.sin(a) * r;
+      node.vx = 0;
+      node.vy = 0;
+      seededIds.current.add(node.id);
+      seedIndex++;
+    }
+
     fg.d3ReheatSimulation();
   }, [nodes, links]);
 
@@ -130,7 +156,7 @@ export default function GraphWrapper({
       nodeCanvasObject={(node, ctx, globalScale) => {
         const x = node.x ?? 0;
         const y = node.y ?? 0;
-        const r = 3.5 + (node.confidence ?? 0) * 5;
+        const r = NODE_R;
         const isSelected = node.id === selectedId;
 
         ctx.beginPath();
@@ -159,7 +185,7 @@ export default function GraphWrapper({
       nodePointerAreaPaint={(node, paintColor, ctx, globalScale) => {
         const x = node.x ?? 0;
         const y = node.y ?? 0;
-        const r = 3.5 + (node.confidence ?? 0) * 5;
+        const r = NODE_R;
         const fontSize = Math.max(3.5, 11 / globalScale);
         ctx.fillStyle = paintColor;
         // Hit target bigger than the mark: circle plus the label block.

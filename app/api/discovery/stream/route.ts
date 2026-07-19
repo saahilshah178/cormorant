@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRun } from "workflow/api";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/auth";
 
 /**
@@ -23,6 +24,18 @@ export async function GET(req: Request) {
       { error: "workflowRunId is required." },
       { status: 400 },
     );
+  }
+
+  // Ownership check: only stream a run this VC started, so knowing another
+  // account's workflow run id can't leak their live agent activity.
+  const { data: ownRun } = await getSupabaseAdmin()
+    .from("discovery_runs")
+    .select("id")
+    .eq("workflow_run_id", workflowRunId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!ownRun) {
+    return NextResponse.json({ error: "Run not found." }, { status: 404 });
   }
 
   try {

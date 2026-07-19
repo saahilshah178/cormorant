@@ -75,8 +75,8 @@ export function DealMap({
       {/* Reading hint + legend (identity is never color-alone). */}
       <div className="pointer-events-none absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-col gap-1.5">
         <p className="text-muted-foreground text-xs">
-          Closer to center → higher thesis fit · larger node → stronger
-          evidence · lines → shared investor or adjacent market
+          Closer to center → higher thesis fit · lines → shared investor or
+          adjacent market
         </p>
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
           {legendSectors.map((sector) => (
