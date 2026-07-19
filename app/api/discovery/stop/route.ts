@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { resumeHook } from "workflow/api";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/auth";
 
 /**
- * Stop a discovery run (PLAN.md 4.3 loop control): flips the DB status (batch
- * rounds check it between rounds) AND resumes the deterministic stop hook
- * (`discovery-stop-<runId>`) so a continuous run sleeping between rounds
- * breaks its loop immediately.
+ * Stop a discovery run (PLAN.md 4.3 loop control): flips discovery_runs.status
+ * to "stopped". The workflow checks this between rounds (via loadContext) and
+ * ends cooperatively at the next round boundary — the in-flight round finishes
+ * first so nothing is left half-inserted.
  */
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -42,13 +41,6 @@ export async function POST(req: Request) {
     .from("discovery_runs")
     .update({ status: "stopped", stopped_at: new Date().toISOString() })
     .eq("id", run.id);
-
-  try {
-    await resumeHook(`discovery-stop-${run.id}`, { stop: true });
-  } catch {
-    // The workflow may have already finished (hook gone) — DB status is set,
-    // which is what a still-live batch loop checks anyway.
-  }
 
   return NextResponse.json({ ok: true });
 }

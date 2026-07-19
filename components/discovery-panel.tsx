@@ -21,9 +21,9 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
- * Discovery settings panel (PLAN.md 4.4): mode toggle (batch w/ target count
- * vs continuous), start/stop, persistent free-text instructions, and the live
- * agent-activity log read from the run's namespaced streams
+ * Discovery settings panel (PLAN.md 4.4): a target-count input that finds
+ * exactly that many companies, start/stop, persistent free-text instructions,
+ * and the live agent-activity log read from the run's namespaced streams
  * (logs:scraper / logs:review / logs:grading).
  *
  * The run itself is a durable background workflow: closing the tab never
@@ -36,7 +36,6 @@ import { cn } from "@/lib/utils";
 
 type DiscoveryRun = {
   id: string;
-  mode: "batch" | "continuous";
   target_count: number | null;
   status: "running" | "stopped" | "completed" | "failed";
   workflow_run_id: string | null;
@@ -62,7 +61,6 @@ export function DiscoveryPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
-  const [mode, setMode] = useState<"batch" | "continuous">("batch");
   const [target, setTarget] = useState(5);
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [draft, setDraft] = useState("");
@@ -156,7 +154,7 @@ export function DiscoveryPanel({
       const res = await fetch("/api/discovery/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, targetCount: target }),
+        body: JSON.stringify({ targetCount: target }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -166,7 +164,7 @@ export function DiscoveryPanel({
     } finally {
       setBusy(false);
     }
-  }, [mode, target]);
+  }, [target]);
 
   const stopRun = useCallback(async () => {
     if (!run) return;
@@ -231,7 +229,7 @@ export function DiscoveryPanel({
         Discovery
         {running && (
           <span className="text-muted-foreground tabular-nums">
-            {run?.companies_found ?? 0} found
+            {run?.companies_found ?? 0}/{run?.target_count ?? "?"} found
           </span>
         )}
       </DialogTrigger>
@@ -255,9 +253,7 @@ export function DiscoveryPanel({
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div className="text-sm">
               <span className="mr-2 inline-block size-2 animate-pulse rounded-full bg-emerald-500" />
-              {run?.mode === "batch"
-                ? `Batch run · ${run?.companies_found ?? 0}/${run?.target_count} companies found`
-                : `Continuous run · ${run?.companies_found ?? 0} companies found`}
+              {`Discovering · ${run?.companies_found ?? 0}/${run?.target_count} companies found`}
             </div>
             <Button
               size="sm"
@@ -272,57 +268,34 @@ export function DiscoveryPanel({
         ) : (
           <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
             <div className="flex flex-col gap-1">
-              <span className="text-muted-foreground text-xs">Mode</span>
-              <div
-                role="group"
-                aria-label="Discovery mode"
-                className="border-border flex rounded-lg border p-0.5"
+              <label
+                htmlFor="discovery-target"
+                className="text-muted-foreground text-xs"
               >
-                {(["batch", "continuous"] as const).map((m) => (
-                  <Button
-                    key={m}
-                    size="sm"
-                    variant={mode === m ? "secondary" : "ghost"}
-                    aria-pressed={mode === m}
-                    className="capitalize"
-                    onClick={() => setMode(m)}
-                  >
-                    {m}
-                  </Button>
-                ))}
-              </div>
+                Companies to find
+              </label>
+              <Input
+                id="discovery-target"
+                type="number"
+                min={1}
+                max={25}
+                value={target}
+                onChange={(e) =>
+                  setTarget(
+                    Math.min(25, Math.max(1, Number(e.target.value) || 1)),
+                  )
+                }
+                className="w-24"
+              />
             </div>
-            {mode === "batch" && (
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="discovery-target"
-                  className="text-muted-foreground text-xs"
-                >
-                  Target companies
-                </label>
-                <Input
-                  id="discovery-target"
-                  type="number"
-                  min={1}
-                  max={25}
-                  value={target}
-                  onChange={(e) =>
-                    setTarget(
-                      Math.min(25, Math.max(1, Number(e.target.value) || 1)),
-                    )
-                  }
-                  className="w-24"
-                />
-              </div>
-            )}
             <Button onClick={startRun} disabled={busy}>
               {busy ? <Loader2Icon className="animate-spin" /> : <RadarIcon />}
-              Start {mode === "batch" ? `batch (${target})` : "continuous"} run
+              Find {target} {target === 1 ? "company" : "companies"}
             </Button>
             {run && (
               <p className="text-muted-foreground w-full text-xs">
-                Last run: {run.mode} · {run.status} · {run.companies_found}{" "}
-                companies found
+                Last run: {run.status} · {run.companies_found} of{" "}
+                {run.target_count} companies found
               </p>
             )}
           </div>

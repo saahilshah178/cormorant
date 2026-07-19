@@ -42,7 +42,7 @@ export type SourceKey =
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
-const PER_SOURCE_CAP = 25;
+const PER_SOURCE_CAP = 40;
 
 async function get(url: string, headers: Record<string, string> = {}) {
   return fetch(url, {
@@ -68,22 +68,27 @@ function stripTags(s: string): string {
     .trim();
 }
 
-/** YC directory (yc-oss static mirror): the two most recent published batches. */
+/** YC directory (yc-oss static mirror): the several most recent published batches. */
 export async function fetchYCCandidates(): Promise<Candidate[]> {
-  // Batch slugs are seasonal; try the plausible recent ones and keep the
-  // first two that exist (all three 2026 batches verified live at build time).
+  // Batch slugs are seasonal; try the plausible recent ones and keep the first
+  // few that exist. Pulling 4 batches (not 2) roughly doubles the YC pool so
+  // deeper rounds keep finding fresh on-thesis and niche companies to advance
+  // into rather than re-hitting the same top names.
   const year = new Date().getFullYear();
   const slugs = [
+    `fall-${year}`,
     `summer-${year}`,
     `spring-${year}`,
     `winter-${year}`,
     `fall-${year - 1}`,
     `summer-${year - 1}`,
+    `spring-${year - 1}`,
+    `winter-${year - 1}`,
   ];
   const out: Candidate[] = [];
   let batchesUsed = 0;
   for (const slug of slugs) {
-    if (batchesUsed >= 2) break;
+    if (batchesUsed >= 4) break;
     const res = await get(`https://yc-oss.github.io/api/batches/${slug}.json`);
     if (!res.ok) continue;
     batchesUsed++;
@@ -93,6 +98,7 @@ export async function fetchYCCandidates(): Promise<Candidate[]> {
       long_description?: string;
       website?: string;
       industry?: string;
+      subindustry?: string;
       tags?: string[];
       batch?: string;
       url?: string;
@@ -105,8 +111,10 @@ export async function fetchYCCandidates(): Promise<Candidate[]> {
         snippet: [
           c.one_liner ?? c.long_description?.slice(0, 200) ?? "",
           c.batch ? `YC ${c.batch}.` : "",
-          c.industry ?? "",
-          (c.tags ?? []).slice(0, 4).join(", "),
+          // Surface industry + subindustry + tags so triage can spot niche
+          // verticals, not just the headline industries.
+          [c.industry, c.subindustry].filter(Boolean).join(" / "),
+          (c.tags ?? []).slice(0, 5).join(", "),
         ]
           .filter(Boolean)
           .join(" · "),
@@ -120,10 +128,12 @@ export async function fetchYCCandidates(): Promise<Candidate[]> {
   return out.slice(0, PER_SOURCE_CAP * 2); // YC batches are dense with real startups
 }
 
-/** Hacker News Show HN launches via the Algolia API. */
+/** Hacker News Show HN + Launch HN via the Algolia API (both = real launches). */
 export async function fetchHackerNewsCandidates(): Promise<Candidate[]> {
+  // Show HN (indie/self-serve launches) OR Launch HN (YC-backed launches) —
+  // two different populations, both real companies announcing themselves.
   const res = await get(
-    "https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&hitsPerPage=30",
+    "https://hn.algolia.com/api/v1/search_by_date?tags=(show_hn,launch_hn)&hitsPerPage=50",
   );
   if (!res.ok) throw new Error(`HN Algolia ${res.status}`);
   const data = (await res.json()) as {
@@ -140,7 +150,7 @@ export async function fetchHackerNewsCandidates(): Promise<Candidate[]> {
     .filter((h) => h.title)
     .slice(0, PER_SOURCE_CAP)
     .map((h) => ({
-      name: (h.title ?? "").replace(/^Show HN:\s*/i, "").trim(),
+      name: (h.title ?? "").replace(/^(Show|Launch) HN:\s*/i, "").trim(),
       snippet: [
         h.title,
         h.story_text ? stripTags(h.story_text).slice(0, 240) : "",
@@ -186,7 +196,9 @@ export async function fetchProductHuntCandidates(): Promise<Candidate[]> {
 
 /** GitHub: recently created repos with traction, via the keyless search API. */
 export async function fetchGitHubCandidates(): Promise<Candidate[]> {
-  const since = new Date(Date.now() - 21 * 24 * 3600 * 1000)
+  // 60-day window (was 21) so the pool is wider and later rounds still have
+  // fresh, not-yet-reviewed repos to advance into.
+  const since = new Date(Date.now() - 60 * 24 * 3600 * 1000)
     .toISOString()
     .slice(0, 10);
   const res = await get(
@@ -308,7 +320,22 @@ export async function searchCandidates(query: string): Promise<Candidate[]> {
     }));
   }
 
-  // Keyless fallback: HN full-text search (real query-string search API).
+  // Keyless fallback: HN full-text search + GitHub repo search — two different
+  // populations, so the broaden-the-net / niche pass reaches beyond a single
+  // site even with no Exa/Tavily key. Each is failure-isolated so one being
+  // rate-limited never sinks the whole pass.
+  const [hn, gh] = await Promise.allSettled([
+    searchHackerNews(query),
+    searchGitHubRepos(query),
+  ]);
+  const out: Candidate[] = [];
+  if (hn.status === "fulfilled") out.push(...hn.value);
+  if (gh.status === "fulfilled") out.push(...gh.value);
+  return out;
+}
+
+/** Keyless HN full-text search (real query-string search API). */
+async function searchHackerNews(query: string): Promise<Candidate[]> {
   const res = await get(
     `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=15`,
   );
@@ -330,6 +357,36 @@ export async function searchCandidates(query: string): Promise<Candidate[]> {
       source: "search" as const,
       website: h.url ?? null,
     }));
+}
+
+/** Keyless GitHub repo search by keyword — reaches niche/vertical projects. */
+async function searchGitHubRepos(query: string): Promise<Candidate[]> {
+  const res = await get(
+    `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=15`,
+    { Accept: "application/vnd.github+json" },
+  );
+  if (!res.ok) throw new Error(`GitHub repo search ${res.status}`);
+  const data = (await res.json()) as {
+    items: {
+      full_name: string;
+      html_url: string;
+      description?: string | null;
+      stargazers_count?: number;
+      homepage?: string | null;
+    }[];
+  };
+  return (data.items ?? []).map((r) => ({
+    name: r.full_name.split("/")[1] ?? r.full_name,
+    snippet: [
+      r.description ?? "",
+      `${r.stargazers_count ?? 0} GitHub stars (matched search: "${query}")`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    source_url: r.html_url,
+    source: "search" as const,
+    website: r.homepage || null,
+  }));
 }
 
 /** Dispatcher the workflow steps call by key (functions aren't serializable). */

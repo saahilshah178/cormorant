@@ -9,9 +9,11 @@ import { discoveryWorkflow } from "@/lib/discovery/pipeline";
  * Kick off a discovery run (PLAN.md 4.3/4.4): inserts the discovery_runs row,
  * start()s the durable workflow, and records the Workflow DevKit run id so the
  * UI can reattach to the stream after a page reload. The run itself survives
- * the tab closing — that's the whole point of the durable pipeline.
+ * the tab closing — that's the whole point of the durable pipeline. A run finds
+ * exactly `targetCount` companies (or stops short only if the sources are truly
+ * exhausted).
  *
- * POST body: { mode?: "batch"|"continuous", targetCount?: number, thesisId?: string }
+ * POST body: { targetCount?: number, thesisId?: string }
  */
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -20,7 +22,6 @@ export async function POST(req: Request) {
   }
 
   let body: {
-    mode?: "batch" | "continuous";
     targetCount?: number;
     thesisId?: string;
   } = {};
@@ -29,11 +30,10 @@ export async function POST(req: Request) {
   } catch {
     // defaults below
   }
-  const mode = body.mode === "continuous" ? "continuous" : "batch";
-  const targetCount =
-    mode === "batch"
-      ? Math.min(Math.max(Math.round(body.targetCount ?? 5), 1), 25)
-      : null;
+  const targetCount = Math.min(
+    Math.max(Math.round(body.targetCount ?? 5), 1),
+    25,
+  );
 
   const thesis = body.thesisId
     ? await getThesisById(body.thesisId, user.id)
@@ -61,7 +61,9 @@ export async function POST(req: Request) {
   const { data: run, error } = await db
     .from("discovery_runs")
     .insert({
-      mode,
+      // `mode` is retained in the schema but always "batch" now that the
+      // continuous scanning feature has been removed.
+      mode: "batch",
       target_count: targetCount,
       thesis_id: thesis.id,
       status: "running",
@@ -77,7 +79,7 @@ export async function POST(req: Request) {
 
   try {
     const wfRun = await start(discoveryWorkflow, [
-      { runId: run.id, mode, targetCount, thesis },
+      { runId: run.id, targetCount, thesis },
     ]);
     await db
       .from("discovery_runs")
