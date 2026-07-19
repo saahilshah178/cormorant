@@ -19,7 +19,7 @@ export type ThesisFormState = { error: string | null };
 function parseThesisForm(formData: FormData) {
   return thesisInputSchema.safeParse({
     name: formData.get("name"),
-    stage: formData.get("stage"),
+    stages: formData.getAll("stages"),
     industries: formData.getAll("industries"),
     min_traction: String(formData.get("min_traction") ?? ""),
     demographics_pref: String(formData.get("demographics_pref") ?? ""),
@@ -104,6 +104,10 @@ export async function setActiveThesisAction(thesisId: string): Promise<void> {
 export async function signOutAction(): Promise<void> {
   const supabase = await getSupabaseServer();
   await supabase.auth.signOut();
+  // Clear the active-thesis cookie so the next account on this browser doesn't
+  // start out pointing at the previous user's selection.
+  const jar = await cookies();
+  jar.delete(ACTIVE_THESIS_COOKIE);
   revalidatePath("/", "layout");
   redirect("/");
 }

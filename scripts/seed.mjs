@@ -45,7 +45,7 @@ const db = createClient(url, key, {
 const THESES = [
   {
     name: "Pre-seed deeptech",
-    stage: "pre_seed",
+    stages: ["pre_seed", "seed"],
     industries: ["ai_infra", "robotics", "biotech", "space", "defense", "climate"],
     min_traction:
       "Working prototype or credible technical demo; revenue not required.",
@@ -56,7 +56,7 @@ const THESES = [
   },
   {
     name: "Series A consumer",
-    stage: "series_a",
+    stages: ["series_a"],
     industries: ["consumer", "fintech", "healthcare"],
     min_traction:
       "At least $1M ARR or 100K+ monthly active users with strong retention.",
@@ -100,6 +100,8 @@ async function seedCompanies() {
   let signalsSkipped = 0;
 
   for (const c of companies) {
+    // No user_id: seed companies are the shared demo pool (user_id IS NULL),
+    // visible to every signed-in VC. Only discovered companies get an owner.
     const companyRow = {
       name: c.name,
       website: c.website ?? null,

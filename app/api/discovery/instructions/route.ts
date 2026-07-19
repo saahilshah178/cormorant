@@ -17,6 +17,7 @@ export async function GET() {
     .from("discovery_instructions")
     .select("*")
     .eq("active", true)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: true });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   }
   const { data, error } = await getSupabaseAdmin()
     .from("discovery_instructions")
-    .insert({ text, active: true })
+    .insert({ text, active: true, user_id: user.id })
     .select("*")
     .single();
   if (error) {
@@ -67,7 +68,8 @@ export async function DELETE(req: Request) {
   const { error } = await getSupabaseAdmin()
     .from("discovery_instructions")
     .update({ active: false })
-    .eq("id", body.id);
+    .eq("id", body.id)
+    .eq("user_id", user.id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

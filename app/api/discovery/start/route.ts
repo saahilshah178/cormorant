@@ -50,6 +50,7 @@ export async function POST(req: Request) {
     .from("discovery_runs")
     .select("id")
     .eq("status", "running")
+    .eq("user_id", user.id)
     .limit(1);
   if ((activeRuns ?? []).length > 0) {
     return NextResponse.json(
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
       target_count: targetCount,
       thesis_id: thesis.id,
       status: "running",
+      user_id: user.id,
     })
     .select("*")
     .single();
@@ -79,7 +81,7 @@ export async function POST(req: Request) {
 
   try {
     const wfRun = await start(discoveryWorkflow, [
-      { runId: run.id, targetCount, thesis },
+      { runId: run.id, targetCount, thesis, userId: user.id },
     ]);
     await db
       .from("discovery_runs")

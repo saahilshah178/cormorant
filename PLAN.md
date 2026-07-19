@@ -41,6 +41,29 @@ stay shared/global across every account; only `theses` rows are user-owned. This
 deliberate scope change requested outside the original tier plan, made this close to the
 freeze — flagged as a risk, not silently absorbed.
 
+**Scope amendment (2026-07-19, per-user data isolation):** the "companies/signals/scores stay
+global" line above was found to leak across accounts — one VC's discovered companies,
+discovery instructions, and discovery runs were visible to (and stoppable by) every other
+account. Fixed by scoping companies and discovery per-user while keeping the seed set shared:
+- `companies` gained a nullable `user_id` (migration
+  `supabase/migrations/20260719120000_per_user_data.sql`). `user_id IS NULL` = the shared
+  pre-indexed 43-company demo pool, visible to everyone; a non-null `user_id` = a company that
+  VC discovered, private to them. Every company read is now `user_id IS NULL OR user_id = me`
+  (`app/api/score/route.ts`, `lib/dealflow.ts`, and the discovery dedup in
+  `lib/discovery/pipeline.ts`).
+- `signals` stay owner-less but inherit visibility through their `company_id` (the score route
+  now loads signals only for visible companies; dealflow reads them via the score→company embed).
+- `scores` still partition per-user through `thesis_id` (theses are per-user) — no new column.
+- `discovery_instructions` and `discovery_runs` gained `user_id`; the instructions/start/status/
+  stop/stream routes and the pipeline now filter by it. The "one run at a time" lock is now
+  per-user, and Stop/stream enforce ownership.
+- RLS was enabled on all four tables as defense-in-depth (the service-role client still bypasses
+  it; app-level `user_id` filters remain the real enforcement, same as `theses`).
+
+Login fixes shipped alongside: `signOutAction` now clears the active-thesis cookie; the home
+page renders the previously-silent `?signin=1` / `?auth_error=1` notices; and `/dealflow`
+redirects a thesis-less user to `/onboarding` instead of showing an empty screen.
+
 ### Tiered scope — this is the most important section
 Build strictly in tier order. Do not start a tier until the previous one works end to end and
 is committed. The outreach tier is real product value but carries zero judging weight, so it

@@ -49,23 +49,36 @@ export async function POST(req: Request) {
 
   const db = getSupabaseAdmin();
 
-  const [companiesRes, signalsRes, scoresRes] = await Promise.all([
+  // Companies visible to this VC: the shared seed pool (user_id IS NULL) plus
+  // their own discovered companies. Never another account's private companies.
+  const companiesRes = await db
+    .from("companies")
+    .select("id, name, website, github_url, sector, stage, source")
+    .neq("source", "tier0-db-check")
+    .or(`user_id.is.null,user_id.eq.${user.id}`);
+  if (companiesRes.error) {
+    return NextResponse.json({ error: companiesRes.error.message }, { status: 500 });
+  }
+  const companies = (companiesRes.data ?? []) as (CompanyRow & {
+    source: string | null;
+  })[];
+  const companyIds = companies.map((c) => c.id);
+
+  // Signals scoped to the visible companies so other accounts' private signal
+  // text is never even read into memory.
+  const [signalsRes, scoresRes] = await Promise.all([
     db
-      .from("companies")
-      .select("id, name, website, github_url, sector, stage, source")
-      .neq("source", "tier0-db-check"),
-    db.from("signals").select("id, company_id, kind, value, source_url, confidence"),
+      .from("signals")
+      .select("id, company_id, kind, value, source_url, confidence")
+      .in("company_id", companyIds),
     db.from("scores").select("company_id").eq("thesis_id", thesis.id),
   ]);
-  for (const res of [companiesRes, signalsRes, scoresRes]) {
+  for (const res of [signalsRes, scoresRes]) {
     if (res.error) {
       return NextResponse.json({ error: res.error.message }, { status: 500 });
     }
   }
 
-  const companies = (companiesRes.data ?? []) as (CompanyRow & {
-    source: string | null;
-  })[];
   const signalsByCompany = new Map<string, SignalRow[]>();
   for (const s of signalsRes.data ?? []) {
     const list = signalsByCompany.get(s.company_id) ?? [];

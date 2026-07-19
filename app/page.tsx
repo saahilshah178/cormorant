@@ -27,11 +27,34 @@ const pillars = [
   },
 ];
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ signin?: string; auth_error?: string }>;
+}) {
   const user = await getCurrentUser();
+  const params = await searchParams;
+  const notice = params.auth_error
+    ? "Sign-in failed. Please try again."
+    : params.signin
+      ? "Please sign in to continue."
+      : null;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-6 py-16">
+      {notice && (
+        <div
+          role="status"
+          className={cn(
+            "mb-6 rounded-lg border p-3 text-sm",
+            params.auth_error
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : "border-border bg-muted/50 text-foreground",
+          )}
+        >
+          {notice}
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <span className="text-3xl font-semibold tracking-tight">Cormorant</span>
         <Badge variant="secondary">The VC brain</Badge>

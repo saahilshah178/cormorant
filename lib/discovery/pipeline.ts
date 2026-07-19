@@ -47,6 +47,7 @@ export type DiscoveryInput = {
   runId: string;
   targetCount: number;
   thesis: Thesis;
+  userId: string;
 };
 
 type RunContext = {
@@ -85,17 +86,24 @@ async function writeLine(namespace: string | undefined, line: string) {
 
 /* ------------------------------- steps --------------------------------- */
 
-async function loadContext(runId: string): Promise<RunContext> {
+async function loadContext(runId: string, userId: string): Promise<RunContext> {
   "use step";
   const db = getSupabaseAdmin();
   const [runRes, instrRes, companiesRes] = await Promise.all([
     db.from("discovery_runs").select("status").eq("id", runId).maybeSingle(),
+    // This VC's own standing instructions only — never another account's.
     db
       .from("discovery_instructions")
       .select("text")
       .eq("active", true)
+      .eq("user_id", userId)
       .order("created_at", { ascending: true }),
-    db.from("companies").select("name, website"),
+    // Dedupe against the shared seed pool + this VC's own companies, so each
+    // account can independently discover a company another account already has.
+    db
+      .from("companies")
+      .select("name, website")
+      .or(`user_id.is.null,user_id.eq.${userId}`),
   ]);
   const instructions = (instrRes.data ?? [])
     .map((r) => r.text)
@@ -259,6 +267,7 @@ async function reviewCandidate(
   instructions: string,
   existingNames: string[],
   existingDomains: string[],
+  allowedStages: string[],
 ): Promise<ReviewedCandidate | null> {
   "use step";
   const log = (msg: string) =>
@@ -311,9 +320,13 @@ async function reviewCandidate(
       system:
         "You are the review agent of a VC discovery pipeline. From a candidate mention and the ACTUAL text of its source page, " +
         "decide if this is a real startup company and extract structured signals. Every signal's value must be a concrete claim " +
-        "supported by the provided page content — never invent facts not on the page. If the page doesn't support a real signal, return an empty signals list.",
+        "supported by the provided page content — never invent facts not on the page. If the page doesn't support a real signal, return an empty signals list. " +
+        "Determine the company's funding stage (pre_seed, seed, series_a, series_b) from the page — infer it from funding-round mentions, raise amounts, team size, and launch recency. Use null ONLY when the page gives no basis to judge stage.",
       prompt: [
-        `## VC thesis (context only — do NOT reject off-thesis companies here; grading handles fit)\n${thesisSummary}`,
+        `## VC thesis (sector/fit is graded later — do NOT reject off-sector companies here)\n${thesisSummary}`,
+        allowedStages.length
+          ? `## Target stages\nThe VC only wants companies at these stages: ${allowedStages.join(", ")}. Determine the company's stage as accurately as you can from the page.`
+          : "",
         instructions ? `## Standing VC instructions\n${instructions}` : "",
         `## Candidate\n${JSON.stringify({ name: candidate.name, snippet: candidate.snippet, source: candidate.source, source_url: candidate.source_url, website: candidate.website })}`,
         `## Source page content (truncated)\n${pageText}`,
@@ -337,6 +350,18 @@ async function reviewCandidate(
   if (extracted.signals.length === 0) {
     await log("rejected: no citable signals on the source page");
     return null;
+  }
+  // Hard stage gate: unlike the shared seed set (which spans all stages), newly
+  // discovered companies must match one of the thesis's selected stages. A
+  // company whose stage is off-thesis — or can't be pinned to a selected stage
+  // at all — is not added. (Sector/fit is still handled softly by grading.)
+  if (allowedStages.length > 0) {
+    if (!extracted.stage || !allowedStages.includes(extracted.stage)) {
+      await log(
+        `rejected: stage ${extracted.stage ?? "unknown"} not in thesis stages (${allowedStages.join(", ")})`,
+      );
+      return null;
+    }
   }
   // Re-check dedupe under the extracted canonical name/site too.
   if (existingNames.includes(normalizeName(extracted.name))) {
@@ -374,6 +399,7 @@ async function insertAndGrade(
   thesis: Thesis,
   runId: string,
   foundSoFar: number,
+  userId: string,
 ): Promise<{ inserted: boolean; total: number }> {
   "use step";
   const log = (msg: string) =>
@@ -381,10 +407,13 @@ async function insertAndGrade(
   const db = getSupabaseAdmin();
 
   // Last-line dedupe against the live DB (covers races and prior rounds).
+  // Scoped to the shared pool + this VC's own companies so another account
+  // owning the same company doesn't block this discovery.
   const { data: dupes } = await db
     .from("companies")
     .select("id, name")
-    .ilike("name", reviewed.name);
+    .ilike("name", reviewed.name)
+    .or(`user_id.is.null,user_id.eq.${userId}`);
   if ((dupes ?? []).length > 0) {
     await log("skipped: already in companies (live check)");
     return { inserted: false, total: foundSoFar };
@@ -398,6 +427,7 @@ async function insertAndGrade(
       sector: reviewed.sector,
       stage: reviewed.stage,
       source: `discovery:${reviewed.source}`,
+      user_id: userId,
     })
     .select("id, name, website, github_url, sector, stage")
     .single();
@@ -522,7 +552,7 @@ function domainOf(url: string | null | undefined): string | null {
 function summarizeThesis(thesis: Thesis): string {
   return JSON.stringify({
     name: thesis.name,
-    stage: thesis.stage,
+    stages: thesis.stages,
     industries: thesis.industries,
     min_traction: thesis.min_traction,
     demographics_pref: thesis.demographics_pref,
@@ -557,18 +587,56 @@ const NICHE_QUALIFIERS = [
   "AI agents",
 ];
 
-function buildSearchQuery(thesis: Thesis, round: number): string {
+/**
+ * Pull the concrete steering terms out of the free-text VC instructions so they
+ * actually shape what the search source fetches — not just how candidates are
+ * later triaged. We keep the POSITIVE guidance (what to look for) and drop
+ * negative "avoid/exclude/no ..." clauses, since keyword search can't negate and
+ * feeding "avoid consumer" would only pull consumer results in. Exclusions are
+ * still honored downstream by the triage/review agents, which do get the full
+ * instruction text.
+ */
+function instructionSearchTerms(instructions: string): string {
+  if (!instructions.trim()) return "";
+  return instructions
+    .split(/[\n,.;]+/)
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .filter((c) => !/^(avoid|exclude|no|not|skip|ignore|don'?t)\b/i.test(c))
+    .map((c) => c.replace(/^(prioriti[sz]e|prefer|focus on|look for)\s+/i, ""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+}
+
+function buildSearchQuery(
+  thesis: Thesis,
+  round: number,
+  instructions = "",
+): string {
   const industries = thesis.industries?.length ? thesis.industries : ["AI"];
   const industry = industries[(round - 1) % industries.length];
-  const stage = thesis.stage ? thesis.stage.replace("_", "-") : "seed";
+  // Rotate across the thesis's selected stages so multi-stage theses widen the
+  // net over all of them across rounds rather than fixating on one.
+  const stages = thesis.stages?.length ? thesis.stages : ["seed"];
+  const stage = stages[(round - 1) % stages.length].replace("_", "-");
+
+  // The VC's standing instructions steer WHAT we search for, not only how we
+  // triage — without this the query is built purely from the thesis and the
+  // instructions never change what the search source actually returns.
+  const steer = instructionSearchTerms(instructions);
 
   // Every third round: narrow into a niche vertical rather than the broad term.
+  let base: string;
   if (round % 3 === 0) {
     const qualifier = NICHE_QUALIFIERS[(round - 1) % NICHE_QUALIFIERS.length];
-    return `${industry} ${qualifier} startup`;
+    base = `${industry} ${qualifier} startup`;
+  } else {
+    const shape = QUERY_SHAPES[(round - 1) % QUERY_SHAPES.length];
+    base = shape(industry, stage);
   }
-  const shape = QUERY_SHAPES[(round - 1) % QUERY_SHAPES.length];
-  return shape(industry, stage);
+  return steer ? `${base} ${steer}` : base;
 }
 
 function dedupeCandidates(candidates: Candidate[]): Candidate[] {
@@ -609,7 +677,7 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
     let dryRounds = 0;
     while (found < target) {
       round++;
-      const ctx = await loadContext(input.runId);
+      const ctx = await loadContext(input.runId, input.userId);
       if (ctx.status === "stopped") {
         status = "stopped";
         break;
@@ -634,7 +702,7 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
           thesisSummary,
           ctx.instructions,
           excludeKeys,
-          buildSearchQuery(input.thesis, round),
+          buildSearchQuery(input.thesis, round, ctx.instructions),
         ),
       ]);
 
@@ -672,6 +740,7 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
             ctx.instructions,
             ctx.existingNames,
             ctx.existingDomains,
+            input.thesis.stages ?? [],
           ),
         ),
       );
@@ -688,7 +757,13 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
       const foundBefore = found;
       for (const r of accepted) {
         if (found >= target) break;
-        const res = await insertAndGrade(r, input.thesis, input.runId, found);
+        const res = await insertAndGrade(
+          r,
+          input.thesis,
+          input.runId,
+          found,
+          input.userId,
+        );
         found = res.total;
       }
       const addedThisRound = found - foundBefore;

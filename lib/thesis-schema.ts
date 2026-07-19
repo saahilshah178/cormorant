@@ -45,7 +45,7 @@ export const STAGE_LABELS: Record<(typeof STAGES)[number], string> = {
 
 export const thesisInputSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
-  stage: z.enum(STAGES, "Pick a stage"),
+  stages: z.array(z.enum(STAGES)).min(1, "Pick at least one stage"),
   industries: z
     .array(z.enum(INDUSTRIES))
     .min(1, "Pick at least one industry"),
@@ -63,7 +63,7 @@ export type ThesisInput = z.infer<typeof thesisInputSchema>;
 export type Thesis = {
   id: string;
   name: string;
-  stage: string | null;
+  stages: string[];
   industries: string[];
   min_traction: string | null;
   demographics_pref: string | null;
