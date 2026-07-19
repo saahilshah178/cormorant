@@ -71,12 +71,7 @@ export default function GraphWrapper({
     const fg = fgRef.current;
     if (!fg) return;
     fg.d3Force("center", null);
-    // Strong short-range repulsion so same-ring neighbors spread apart instead
-    // of clumping when a drag reheats the sim; distanceMax keeps it local so it
-    // can't inflate the disc and fight the radial fit layout at range.
-    const charge = fg.d3Force("charge");
-    charge?.strength?.(-100);
-    charge?.distanceMax?.(140);
+    fg.d3Force("charge")?.strength?.(-25);
     const link = fg.d3Force("link");
     link?.strength?.(0.02);
     link?.distance?.(60);
@@ -89,11 +84,10 @@ export default function GraphWrapper({
       ).strength(0.85) as never,
     );
     // Keeps same-fit nodes from stacking on top of each other so every node
-    // stays individually clickable; the radius covers the label block drawn
-    // beneath each node, not just the circle.
+    // stays individually clickable.
     fg.d3Force(
       "collide",
-      forceCollide<NodeObject<GraphNode>>(NODE_R + 10).strength(1) as never,
+      forceCollide<NodeObject<GraphNode>>(NODE_R + 6).strength(0.9) as never,
     );
     fg.d3ReheatSimulation();
   }, [nodes, links]);
@@ -108,21 +102,9 @@ export default function GraphWrapper({
     <ForceGraph2D<GraphNode, GraphLink>
       ref={fgRef}
       graphData={graphData}
-      // Nodes are draggable again (the pre-anti-clustering behavior): the node
-      // is pinned to the pointer only for the duration of the drag and released
-      // on drop, so the radial force settles it back onto its fit ring —
-      // distance-from-center stays an honest fit readout and thesis swaps can
-      // still resettle every node. Clicks below the library's drag threshold
-      // never engage a drag, so click-to-open-report is unaffected. The
-      // anti-clustering fixes don't depend on drag being off: seeding lives in
-      // DealflowView and graphData identity stays memoized above.
-      enableNodeDrag={true}
-      onNodeDragEnd={(node) => {
-        // The library already clears these for initially-unpinned nodes; do it
-        // explicitly so a node can never stay pinned against the radial force.
-        node.fx = undefined;
-        node.fy = undefined;
-      }}
+      // Click-to-open-report is the only interaction; dragging would pin nodes
+      // and reheat the sim, so it stays off.
+      enableNodeDrag={false}
       width={width}
       height={height}
       backgroundColor="rgba(0,0,0,0)"
