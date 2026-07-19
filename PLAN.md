@@ -517,6 +517,11 @@ drop (`onNodeDragEnd` clears `fx`/`fy` explicitly), so the radial force settles 
 its fit ring, distance-from-center stays an honest fit readout, and thesis swaps still
 resettle every node. Clicks below the library's few-px drag threshold never engage a drag, so
 click-to-open-report is unchanged. Map hint text now mentions dragging.
+Follow-up (same day): drag-triggered reheats still let nodes drift into clumps under the
+original whisper-weak charge (−25), so the repulsion was retuned — charge −100 with
+`distanceMax` 140 (strong short-range spreading that can't inflate the disc against the
+radial layout) and the collide radius widened to cover each node's label block
+(`NODE_R + 10`, strength 1).
 Implementation notes:
 - `lib/dealflow.ts` + `app/api/dealflow/route.ts` — the ONE data layer both views render
   from: companies with their score + embedded signals for a thesis (via a nested
