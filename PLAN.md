@@ -122,9 +122,11 @@ anything needs enabling in the dashboard for it to run there.
 - `start()` (from `workflow/api`) kicks off a run directly from an API route, but if a
   workflow ever needs to start another workflow from inside itself, `start()` must be wrapped
   in a `"use step"` function first — it cannot be called directly in workflow context.
-- Stop control for continuous-mode discovery runs: a `createHook()` inside the workflow with a
-  deterministic token (e.g. `discovery-stop-{runId}`); the Settings panel's "Stop" button calls
-  `resumeHook(token, { stop: true })` from an API route to break the loop cleanly.
+- Stop control for a discovery run: cooperative — the Settings panel's "Stop" button flips
+  `discovery_runs.status` to `stopped` via an API route, and the workflow checks that status
+  between rounds (in `loadContext`) and ends at the next round boundary. (An earlier
+  `createHook()`/`resumeHook()` stop signal existed only to break the continuous-mode sleep;
+  it was removed with continuous mode — see the Tier 4 status.)
 - Live agent-activity log: use namespaced streams —
   `getWritable({ namespace: 'logs:scraper' })` / `'logs:review'` / `'logs:grading'` — read back
   with `run.getReadable({ namespace })`. Keeps the verbose per-agent log separate from the
@@ -146,10 +148,11 @@ anything needs enabling in the dashboard for it to run there.
   fit_rationale (text), pass_reason (text), contributing_signal_ids[], scored_at
 - `outreach` (Tier 5 only): id, company_id, status (not_contacted | contacted | responded |
   booked | needs_info), scheduled_at, notes
-- `discovery_runs` (Tier 4 only): id, mode (batch | continuous), target_count (int, nullable —
-  batch only), status (running | stopped | completed | failed), workflow_run_id (text, the
-  Workflow DevKit run id — used to reattach/stream/cancel after a page reload), thesis_id,
-  companies_found (int, default 0), started_at, stopped_at
+- `discovery_runs` (Tier 4 only): id, mode (text — retained in the schema but always `batch`
+  since continuous mode was removed), target_count (int — how many companies the run finds),
+  status (running | stopped | completed | failed), workflow_run_id (text, the Workflow DevKit
+  run id — used to reattach/stream/cancel after a page reload), thesis_id, companies_found
+  (int, default 0), started_at, stopped_at
 - `discovery_instructions` (Tier 4 only): id, text, active (bool, default true), created_at —
   persistent free-text guidance the VC gives the discovery agents (e.g. "prioritize fintech
   infra, avoid consumer social"); every active row is concatenated into the scraper/review/
@@ -540,6 +543,35 @@ browser). Uncommitted on `saahil` — review the diff, then commit.** `npm run b
 `npm run lint` are green. Built as a real Workflow DevKit durable pipeline (`workflow` +
 `@workflow/next`), not a request-bound job.
 
+**Bugfix (2026-07-18, post-Tier-4): batch under-delivered its target count.** A batch of 15
+returned only ~6. Root cause: the loop re-scraped the same sources every round and re-triaged
+to the same top candidates, which after round 1 were all already-indexed and got rejected in
+review — so the candidate window never advanced — and a hard `MAX_BATCH_ROUNDS = 3` cap then
+exited the loop far below target while still reporting `completed`. Fix (`lib/discovery/pipeline.ts`):
+(1) thread an exclusion set (indexed + already-reviewed-this-run, rejects included) into the
+scrape/triage step so each round surfaces *fresh* companies deeper in the sources; (2) replace
+the fixed 3-round cap with loop-until-target / loop-until-dry (`MAX_DRY_ROUNDS` consecutive
+empty rounds → stop; `MAX_TOTAL_ROUNDS` safety cap); (3) size the review fan-out to the
+remaining gap; widen triage 5→8/source. Verified: control-flow simulation reaches 15/15 when
+supply exists and terminates honestly at true supply when it doesn't. Determinism preserved —
+the exclusion is derived from memoized `loadContext` output + step-derived state, so it replays
+identically.
+
+**Update (2026-07-18): continuous mode removed + scope widened.** Continuous scanning was cut
+— discovery is now purely "find exactly N companies." Removed: the mode toggle (UI), the
+`mode` request field, the `createHook`/`sleep`/`resumeHook` machinery, and the `Promise.race`
+loop; Stop is now a cooperative `discovery_runs.status` flip the loop checks between rounds.
+The `discovery_runs.mode` column is retained (always `batch`) to avoid a manual migration. To
+fix the "scope of companies feels limited" complaint and make **N requested = N found**
+reliable, candidate supply was widened substantially in `lib/discovery/sources.ts`: YC pulls
+**4** recent batches (was 2) with industry/subindustry/tags surfaced for niche triage, HN adds
+**Launch HN** alongside Show HN, GitHub widened to a **60-day** window, per-source caps raised
+(25→40), and the keyless search pass now queries **HN full-text + GitHub repos** (two
+populations). The search agent's query now **rotates shape each round and probes a niche
+vertical on ~every third round** (`buildSearchQuery`), so the net keeps widening into
+specialized companies rather than re-hitting the obvious names. `npm run build`
+(`workflows build complete (10 steps, 1 workflow)`) and `npm run lint` are green.
+
 Implementation notes:
 - Deps added: `workflow@4` + `@workflow/next@4` (per §2). NOT `@workflow/ai` — its
   `DurableAgent` peers on `ai@^6` and this repo is on `ai@7`, so the scraper/review/grading
@@ -551,16 +583,19 @@ Implementation notes:
   excludes `\.well-known/workflow/` — without this the proxy intercepts WDK's internal step
   requests and breaks execution/resumption (the §2 gotcha, in the wild).
 - `lib/discovery/sources.ts` (4.2) — one fetch+parse function per source returning a uniform
-  `{name, snippet, source_url, source, website}`. All keyless endpoints verified live:
-  YC via the **yc-oss** static mirror (`batches/<slug>.json`, two most-recent batches), HN
-  Show HN via the **Algolia** API, Product Hunt via its public **Atom feed** (regex parse, no
-  XML dep), GitHub via the keyless **search API** (recently-created repos by stars). Wellfound
-  is DataDome bot-walled from every network tried (403 challenge on all paths incl.
-  sitemap.xml) — the function is implemented and parses normally if it ever unblocks, but
-  degrades to `[]` with a warning instead of failing the round. Search (broaden-the-net) uses
-  **Exa or Tavily** when `EXA_API_KEY`/`TAVILY_API_KEY` is set, else a **keyless HN full-text
-  search** fallback so the pass still runs with zero extra signups (documented deviation from
-  §2's "Exa or Tavily" — no key was provisioned; drop one in for wider reach).
+  `{name, snippet, source_url, source, website}`. Deliberately **broad supply** so a run can
+  actually hit its target and reach niche companies: YC via the **yc-oss** static mirror
+  (`batches/<slug>.json`, **four** most-recent batches, with industry/subindustry/tags in the
+  snippet so triage can spot niche verticals), HN **Show HN + Launch HN** via the **Algolia**
+  API, Product Hunt via its public **Atom feed** (regex parse, no XML dep), GitHub via the
+  keyless **search API** (repos created in the last **60 days** by stars). Wellfound is
+  DataDome bot-walled from every network tried (403 challenge on all paths incl. sitemap.xml)
+  — the function is implemented and parses normally if it ever unblocks, but degrades to `[]`
+  with a warning instead of failing the round. Search (broaden-the-net) uses **Exa or Tavily**
+  when `EXA_API_KEY`/`TAVILY_API_KEY` is set, else a **keyless HN full-text search + GitHub
+  repo search** fallback (two different populations) so the pass still runs with zero extra
+  signups (documented deviation from §2's "Exa or Tavily" — no key was provisioned; drop one
+  in for still wider reach).
 - `lib/discovery/pipeline.ts` (4.3) — the `discoveryWorkflow` orchestrator. Per round:
   parallel `scrapeSource` steps (5 fixed sources + search, each reading the thesis + active
   `discovery_instructions`; the cheap model triages raw mentions down to the few worth
@@ -570,18 +605,23 @@ Implementation notes:
   cheap model, grounded only in the fetched page text; reject anything with no citable signal)
   → `insertAndGrade` (insert company + signals, then the SAME Tier-2 `scoreCompany` unchanged,
   persist the score, bump `discovery_runs.companies_found`; a scoring failure **rolls the
-  company back** so the map never shows an unscored ghost node). Loop control: batch stops at
-  `target_count` (or after 3 rounds when the small candidate pool drains); continuous
-  `Promise.race`s a `sleep("60s")` against a `createHook("discovery-stop-<runId>")` each round.
-  Every step catches its own errors and returns empty/null, so one candidate/source failing
-  never drops inserted data.
+  company back** so the map never shows an unscored ghost node). Loop control: each round
+  excludes companies already indexed (DB) or already reviewed this run (rejects included) from
+  triage, so successive rounds **advance deeper into the sources** instead of re-picking the
+  same top candidates; the run loops until it hits `target_count`, or until the sources stop
+  yielding new companies (`MAX_DRY_ROUNDS` consecutive empty rounds), bounded by a
+  `MAX_TOTAL_ROUNDS` safety cap; the per-round review fan-out is sized to the remaining gap
+  (`2× need`, capped) so it never over-reviews past the target; the search agent rotates its
+  query each round and probes a niche vertical on ~every third round. A cooperative **Stop**
+  flips `discovery_runs.status`, which the loop checks between rounds. Every step catches its
+  own errors and returns empty/null, so one candidate/source failing never drops inserted data.
 - API routes: `app/api/discovery/{start,stop,status,stream,instructions}/route.ts`.
   `start` inserts the `discovery_runs` row, `start()`s the workflow, records `workflow_run_id`
-  (reattach after reload). `stop` flips DB status AND `resumeHook(..., {stop:true})`. `stream`
-  proxies `run.getReadable({namespace})` for the per-agent logs. `instructions` GET/POST/DELETE
-  (DELETE = soft `active=false`).
-- `components/discovery-panel.tsx` (4.4) — header "Discovery" dialog: mode toggle (batch +
-  target-count input / continuous), start/stop, the standing-instructions list+box (upserts
+  (reattach after reload). `stop` flips DB status (cooperative — the loop checks it between
+  rounds). `stream` proxies `run.getReadable({namespace})` for the per-agent logs.
+  `instructions` GET/POST/DELETE (DELETE = soft `active=false`).
+- `components/discovery-panel.tsx` (4.4) — header "Discovery" dialog: a target-count input
+  ("Companies to find"), start/stop, the standing-instructions list+box (upserts
   `discovery_instructions`, visibly fed to every future round), and the live agent-activity log
   reading the three namespaced streams (`logs:scraper`/`logs:review`/`logs:grading`,
   color-coded). Polls `/api/discovery/status` while a run is live — dialog open or not — and
@@ -605,11 +645,12 @@ Implementation notes:
 - [x] **4.3 Discovery workflow (Workflow DevKit).** ✅ Batch (target 2) run to completion
   inserted 2 NEW companies, each with signals and a Tier-2 score (e.g. "Archal" [discovery:yc]
   fit 58, pass reason "No signal shows any real product usage, customer deployment, or
-  traction…" — specific + falsifiable, citing real YC URLs). Continuous run inserted companies
-  then the Stop button ended it cleanly (status→stopped) via the resumed hook. **Verify (data
+  traction…" — specific + falsifiable, citing real YC URLs). The Stop button ended a live run
+  cleanly (status→stopped). *(Verified pre-continuous-removal; Stop is now a cooperative status
+  flip — see the Update note above.)* **Verify (data
   integrity):** across all runs, zero duplicate company names (name/domain dedupe + a live
   last-line DB check hold); grading-failure rollback keeps unscored ghosts off the map.
-- [x] **4.4 Discovery settings UI.** ✅ Panel verified in a headless browser: mode toggle,
+- [x] **4.4 Discovery settings UI.** ✅ Panel verified in a headless browser:
   target input, start/stop, standing-instructions list (the persisted "prioritize AI infra and
   devtools" row shows and is fed to the agents), and the live color-coded activity log replaying
   all three namespaced streams (scraper source counts + triage picks, review dedupe/citation
@@ -667,8 +708,8 @@ Gate: nothing crashes on camera; video recorded with buffer.
 ## 8. Scripted demo test case (build toward this exact sequence)
 1. VC onboards with a specific thesis in ~15 seconds.
 2. Hit run; the seed set scores; the deal-flow map fills, companies settling by fit.
-3. (Tier 4) kick off live discovery (batch or continuous, from the Settings panel); a new
-   company node drops in and scores on camera while the rest of the demo continues.
+3. (Tier 4) kick off live discovery (pick how many companies to find, from the Settings
+   panel); new company nodes drop in and score on camera while the rest of the demo continues.
 4. Click the standout company: strong cited fit thesis + a sharp, specific pass reason.
 5. Swap to a second thesis; the same pool visibly reorders.
 6. (Tier 5, only if built) one-click reach out; node flips to "contacted".

@@ -1,4 +1,4 @@
-import { createHook, getWritable, sleep } from "workflow";
+import { getWritable } from "workflow";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -30,18 +30,22 @@ import type { Thesis } from "@/lib/thesis-schema";
  * failing never drops data already inserted and never burns step retries on
  * known-blocked sources.
  *
- * Loop control: batch mode stops at target_count (or when 3 rounds drain the
- * sources); continuous mode loops with a sleep between rounds and races a
- * createHook() stop signal (token `discovery-stop-<runId>`) that the stop
- * route resumes. Note: @workflow/ai's DurableAgent (PLAN.md §2) requires
- * ai@^6 and this repo is on ai@7, so agents are plain generateText calls
- * inside steps — same durability, no sandbox issues.
+ * Loop control: each round excludes companies already indexed or already
+ * reviewed this run, so successive rounds advance deeper into the sources
+ * instead of re-picking the same top candidates (which review would only
+ * reject as dupes). The run loops until it hits target_count, or until the
+ * sources genuinely stop yielding new companies (MAX_DRY_ROUNDS consecutive
+ * empty rounds), bounded by a MAX_TOTAL_ROUNDS safety cap; the search agent
+ * rotates its query each round (and probes a niche vertical on some rounds) so
+ * the net keeps widening. A cooperative Stop flips discovery_runs.status, which
+ * the loop checks between rounds. Note: @workflow/ai's DurableAgent (PLAN.md §2)
+ * requires ai@^6 and this repo is on ai@7, so agents are plain generateText
+ * calls inside steps — same durability, no sandbox issues.
  */
 
 export type DiscoveryInput = {
   runId: string;
-  mode: "batch" | "continuous";
-  targetCount: number | null;
+  targetCount: number;
   thesis: Thesis;
 };
 
@@ -119,13 +123,16 @@ const scraperPickSchema = z.object({
 });
 
 /**
- * One scraper agent: fetch+parse a source, then let the cheap model pick the
- * few candidates worth the review pass given the thesis + VC instructions.
+ * One scraper agent: fetch+parse a source, drop anything already indexed or
+ * already reviewed this run (so each round advances to fresh companies rather
+ * than re-triaging the same top picks), then let the cheap model pick the few
+ * worth the review pass given the thesis + VC instructions.
  */
 async function scrapeSource(
   key: SourceKey,
   thesisSummary: string,
   instructions: string,
+  excludeKeys: string[],
   searchQuery?: string,
 ): Promise<Candidate[]> {
   "use step";
@@ -141,8 +148,21 @@ async function scrapeSource(
     await log("0 candidates (source empty or blocked)");
     return [];
   }
+
+  // Drop anything already indexed or already reviewed this run BEFORE triage,
+  // so each round surfaces fresh companies deeper in the source instead of the
+  // same top picks (which review would only reject as dupes).
+  const exclude = new Set(excludeKeys);
+  const fresh = raw.filter((c) => !exclude.has(normalizeName(c.name)));
+  const droppedSeen = raw.length - fresh.length;
+  if (fresh.length === 0) {
+    await log(`${raw.length} raw, all already seen — nothing fresh`);
+    return [];
+  }
   await log(
-    `${raw.length} raw candidates${searchQuery ? ` for "${searchQuery}"` : ""}`,
+    `${fresh.length} fresh candidate${fresh.length === 1 ? "" : "s"}` +
+      `${droppedSeen ? ` (${droppedSeen} already seen)` : ""}` +
+      `${searchQuery ? ` for "${searchQuery}"` : ""}`,
   );
 
   try {
@@ -152,13 +172,13 @@ async function scrapeSource(
         "You triage raw startup-discovery mentions for a VC deal-flow pipeline. " +
         "Select ONLY plausible startup companies (not libraries, listicles, blog posts, or hobby demos with no company behind them) " +
         "that are worth a deeper review given the VC's thesis and instructions. Prefer on-thesis or adjacent candidates. " +
-        "Return at most 5 indices, best first. Return an empty list if nothing qualifies.",
+        "Return at most 8 indices, best first. Return an empty list if nothing qualifies.",
       prompt: [
         `## VC thesis\n${thesisSummary}`,
         instructions ? `## Standing VC instructions\n${instructions}` : "",
         `## Candidates from source "${key}"`,
         JSON.stringify(
-          raw.map((c, i) => ({ i, name: c.name, snippet: c.snippet })),
+          fresh.map((c, i) => ({ i, name: c.name, snippet: c.snippet })),
           null,
           1,
         ),
@@ -168,18 +188,18 @@ async function scrapeSource(
       output: Output.object({ schema: scraperPickSchema }),
     });
     const picked = output.selected
-      .filter((i) => i >= 0 && i < raw.length)
-      .slice(0, 5)
-      .map((i) => raw[i]);
+      .filter((i) => i >= 0 && i < fresh.length)
+      .slice(0, 8)
+      .map((i) => fresh[i]);
     await log(
       `picked ${picked.length}: ${picked.map((c) => c.name).join(", ") || "—"}`,
     );
     return picked;
   } catch (err) {
     await log(
-      `triage failed (${err instanceof Error ? err.message.slice(0, 120) : err}); passing top 3 raw`,
+      `triage failed (${err instanceof Error ? err.message.slice(0, 120) : err}); passing top 3 fresh`,
     );
-    return raw.slice(0, 3);
+    return fresh.slice(0, 3);
   }
 }
 
@@ -510,11 +530,45 @@ function summarizeThesis(thesis: Thesis): string {
   });
 }
 
+/**
+ * Rotating broaden-the-net query. Each round it varies the industry (round-robin
+ * over the thesis industries) AND the query shape, and on ~every third round it
+ * probes a niche sub-vertical instead of the broad thesis term — so discovery
+ * reaches beyond the obvious on-thesis names into specialized / adjacent
+ * companies the fixed sources miss.
+ */
+const QUERY_SHAPES = [
+  (industry: string, stage: string) => `${industry} startup ${stage} launch`,
+  (industry: string, stage: string) =>
+    `${industry} ${stage} funding announcement`,
+  (industry: string) => `new ${industry} company building`,
+  (industry: string) => `early stage ${industry} startup`,
+];
+
+const NICHE_QUALIFIERS = [
+  "infrastructure",
+  "developer tools",
+  "vertical SaaS",
+  "open source",
+  "API platform",
+  "automation",
+  "marketplace",
+  "protocol",
+  "AI agents",
+];
+
 function buildSearchQuery(thesis: Thesis, round: number): string {
   const industries = thesis.industries?.length ? thesis.industries : ["AI"];
   const industry = industries[(round - 1) % industries.length];
   const stage = thesis.stage ? thesis.stage.replace("_", "-") : "seed";
-  return `${industry} startup ${stage} funding launch`;
+
+  // Every third round: narrow into a niche vertical rather than the broad term.
+  if (round % 3 === 0) {
+    const qualifier = NICHE_QUALIFIERS[(round - 1) % NICHE_QUALIFIERS.length];
+    return `${industry} ${qualifier} startup`;
+  }
+  const shape = QUERY_SHAPES[(round - 1) % QUERY_SHAPES.length];
+  return shape(industry, stage);
 }
 
 function dedupeCandidates(candidates: Candidate[]): Candidate[] {
@@ -531,26 +585,28 @@ function dedupeCandidates(candidates: Candidate[]): Candidate[] {
 
 /* ------------------------------ workflow -------------------------------- */
 
-const MAX_BATCH_ROUNDS = 3;
-const REVIEWS_PER_ROUND = 12;
-const CONTINUOUS_PAUSE = "60s";
+const MAX_TOTAL_ROUNDS = 15; // safety cap (bounds cost if sources never drain)
+const MAX_DRY_ROUNDS = 3; // stop after this many consecutive rounds add nothing new
+const MAX_REVIEWS_PER_ROUND = 16; // ceiling on the review-step fan-out per round
 
 export async function discoveryWorkflow(input: DiscoveryInput) {
   "use workflow";
 
-  // Deterministic token so the stop route can resume it (PLAN.md §2 gotcha).
-  // Created for both modes so Stop never 404s; only continuous races it.
-  const stopHook = createHook<{ stop?: boolean }>({
-    token: `discovery-stop-${input.runId}`,
-  });
+  const target = Math.max(1, input.targetCount);
+  const thesisSummary = summarizeThesis(input.thesis);
 
-  const target =
-    input.mode === "batch" ? Math.max(1, input.targetCount ?? 5) : Infinity;
   let found = 0;
   let status: "completed" | "stopped" | "failed" = "completed";
+  // Normalized names of every candidate reviewed this run (accepted → also in
+  // the DB; rejected → not). Excluding these from each round's triage is what
+  // advances discovery deeper into the sources instead of re-picking the same
+  // top candidates every round. Rebuilt deterministically from step outputs on
+  // replay, so it is safe to hold across the durable loop.
+  const reviewedKeys = new Set<string>();
 
   try {
     let round = 0;
+    let dryRounds = 0;
     while (found < target) {
       round++;
       const ctx = await loadContext(input.runId);
@@ -558,32 +614,54 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
         status = "stopped";
         break;
       }
-      const thesisSummary = summarizeThesis(input.thesis);
+
+      // Everything already indexed (DB) or already tried this run (rejects too).
+      const excludeKeys = Array.from(
+        new Set([...ctx.existingNames, ...reviewedKeys]),
+      );
       await writeLine(
         "logs:scraper",
-        `— round ${round}: scraping ${FIXED_SOURCES.length} fixed sources + search —`,
+        `— round ${round}: scraping ${FIXED_SOURCES.length} fixed sources + search (excluding ${excludeKeys.length} already seen) —`,
       );
 
       // Parallel scraper agents (one per fixed source + the search agent).
       const batches = await Promise.all([
         ...FIXED_SOURCES.map((key) =>
-          scrapeSource(key, thesisSummary, ctx.instructions),
+          scrapeSource(key, thesisSummary, ctx.instructions, excludeKeys),
         ),
         scrapeSource(
           "search",
           thesisSummary,
           ctx.instructions,
+          excludeKeys,
           buildSearchQuery(input.thesis, round),
         ),
       ]);
-      const candidates = dedupeCandidates(batches.flat()).slice(
-        0,
-        REVIEWS_PER_ROUND,
+
+      // Review only as many as we plausibly still need (2× the remaining gap to
+      // absorb rejects), capped, so we never over-review past the target.
+      const need = target - found;
+      const reviewBudget = Math.min(
+        Math.max(4, need * 2),
+        MAX_REVIEWS_PER_ROUND,
       );
-      await writeLine(
-        "logs:review",
-        `— round ${round}: reviewing ${candidates.length} deduped candidates —`,
-      );
+      const candidates = dedupeCandidates(batches.flat())
+        .filter((c) => !reviewedKeys.has(normalizeName(c.name)))
+        .slice(0, reviewBudget);
+      // Mark this round's candidates seen so the next round advances past them.
+      for (const c of candidates) reviewedKeys.add(normalizeName(c.name));
+
+      if (candidates.length === 0) {
+        await writeLine(
+          "logs:review",
+          `— round ${round}: no fresh candidates (sources drained) —`,
+        );
+      } else {
+        await writeLine(
+          "logs:review",
+          `— round ${round}: reviewing ${candidates.length} fresh candidate${candidates.length === 1 ? "" : "s"} (need ${need}) —`,
+        );
+      }
 
       // Parallel review agents, one step per candidate (failure-isolated).
       const reviewed = await Promise.all(
@@ -607,24 +685,32 @@ export async function discoveryWorkflow(input: DiscoveryInput) {
 
       // Grade + insert sequentially so nodes drop onto the map one by one
       // and the run counter never races.
+      const foundBefore = found;
       for (const r of accepted) {
         if (found >= target) break;
         const res = await insertAndGrade(r, input.thesis, input.runId, found);
         found = res.total;
       }
+      const addedThisRound = found - foundBefore;
 
-      if (input.mode === "batch") {
-        if (round >= MAX_BATCH_ROUNDS) break; // sources drained
-      } else {
-        // Continuous: pause between rounds, listening for Stop.
-        const winner = await Promise.race([
-          stopHook.then(() => "stop" as const),
-          sleep(CONTINUOUS_PAUSE).then(() => "tick" as const),
-        ]);
-        if (winner === "stop") {
-          status = "stopped";
-          break;
-        }
+      if (found >= target) break;
+
+      // Loop-until-dry: keep going while rounds still yield new companies; stop
+      // once they stop (sources genuinely exhausted) or the hard round cap hits.
+      dryRounds = addedThisRound > 0 ? 0 : dryRounds + 1;
+      if (dryRounds >= MAX_DRY_ROUNDS) {
+        await writeLine(
+          "logs:grading",
+          `— sources drained: ${found}/${target} found after ${round} rounds —`,
+        );
+        break;
+      }
+      if (round >= MAX_TOTAL_ROUNDS) {
+        await writeLine(
+          "logs:grading",
+          `— round cap reached: ${found}/${target} found —`,
+        );
+        break;
       }
     }
   } catch (err) {
