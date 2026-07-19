@@ -105,6 +105,34 @@ export async function getGmailAccessToken(userId: string): Promise<string> {
 }
 
 /**
+ * RFC 2047 encoded-word for a header value containing non-ASCII (e.g. an em
+ * dash in the subject — raw UTF-8 in a header renders as mojibake like
+ * "â€”" in Gmail, since headers are ASCII-only by spec). Chunked at ≤42
+ * UTF-8 bytes per word (encoded word stays ≤75 chars), never splitting a
+ * multi-byte character; chunks join with folding whitespace.
+ */
+function encodeHeaderValue(value: string): string {
+  if (!/[^\x20-\x7e]/.test(value)) return value;
+  const words: string[] = [];
+  let chunk = "";
+  let chunkBytes = 0;
+  for (const ch of value) {
+    const b = Buffer.byteLength(ch, "utf8");
+    if (chunkBytes + b > 42 && chunk) {
+      words.push(chunk);
+      chunk = "";
+      chunkBytes = 0;
+    }
+    chunk += ch;
+    chunkBytes += b;
+  }
+  if (chunk) words.push(chunk);
+  return words
+    .map((w) => `=?UTF-8?B?${Buffer.from(w, "utf8").toString("base64")}?=`)
+    .join("\r\n ");
+}
+
+/**
  * Create a Gmail draft (never sends). `to` may be null — the draft is still
  * created and the VC adds the recipient in Gmail (the honest empty state,
  * PLAN.md 5.2). Returns the Gmail draft id.
@@ -115,7 +143,7 @@ export async function createGmailDraft(
 ): Promise<string> {
   const mime = [
     ...(to ? [`To: ${to}`] : []),
-    `Subject: ${subject}`,
+    `Subject: ${encodeHeaderValue(subject)}`,
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
     "",
