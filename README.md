@@ -72,5 +72,5 @@ Required environment variables:
 ## Plan
 
 [`PLAN.md`](./PLAN.md) is the single source of truth for the build: scope, tiers, data
-model, scoring-engine requirements, and the step-by-step task breakdown with
-done-conditions.
+model, scoring engine requirements, and the step by step task breakdown with
+done conditions.
