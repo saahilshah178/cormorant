@@ -842,8 +842,14 @@ Implementation notes:
 - [x] **5.4 Editable draft template.** "Edit draft template" below the One-click contact
   button opens a dialog (subject + body, placeholder reference, Save / Reset to default).
   Saved per-account and used for every future one-click draft until changed. Placeholders:
-  `{{company}}`, `{{fit_reason}}` (one-line active-thesis rationale, empty if unscored),
-  `{{sender}}`. Stored in Supabase auth user_metadata (`outreach_template`) — deliberately
+  `{{company}}`, `{{fit_reason}}`, `{{sender}}`. `{{fit_reason}}` is NOT the raw scoring
+  rationale — that text is internal analysis addressed to the VC and leaked jargon
+  ("the thesis's included ai_infra industry") into founder emails when first shipped.
+  `lib/fit-line.ts` rewrites it at draft time as one founder-facing sentence (cheap model,
+  jargon/slug blocklist, empty-string fallback so internal vocabulary can never leak) —
+  verified live: "Your photonic optical interconnects … caught my eye." from a rationale
+  that said "in the thesis's ai_infra sector". Stored in Supabase auth user_metadata
+  (`outreach_template`) — deliberately
   NOT a new table, so the feature needed no additional manual migration.
   `lib/outreach-template.ts` (defaults/validation/rendering, client-safe),
   `app/api/outreach/template/route.ts` (GET/PUT/DELETE), editor UI in

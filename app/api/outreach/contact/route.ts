@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { getCurrentUser } from "@/lib/auth";
 import { getActiveThesis } from "@/lib/theses";
 import { resolveFounderEmail } from "@/lib/founder-email";
+import { composeFounderFitLine } from "@/lib/fit-line";
 import {
   DEFAULT_OUTREACH_TEMPLATE,
   renderOutreachTemplate,
@@ -81,9 +82,11 @@ export async function POST(req: Request) {
     existing?.founder_email ??
     (await resolveFounderEmail({ name: company.name, website: company.website }));
 
-  // One line of why they're a fit, from this VC's active-thesis score.
+  // One founder-facing line on why they caught this VC's eye, rewritten from
+  // the active-thesis scoring rationale (which is internal analysis and must
+  // never appear verbatim in an email to the founder — see lib/fit-line.ts).
   const thesis = await getActiveThesis(user.id);
-  let fitLine: string | null = null;
+  let fitLine = "";
   if (thesis) {
     const { data: score } = await db
       .from("scores")
@@ -91,7 +94,12 @@ export async function POST(req: Request) {
       .eq("company_id", companyId)
       .eq("thesis_id", thesis.id)
       .maybeSingle();
-    fitLine = score?.fit_rationale?.match(/^[^.!?]{10,240}[.!?]/)?.[0]?.trim() ?? null;
+    if (score?.fit_rationale) {
+      fitLine = await composeFounderFitLine({
+        companyName: company.name,
+        fitRationale: score.fit_rationale,
+      });
+    }
   }
 
   // The VC's saved template (PLAN.md 5.4), falling back to the default.

@@ -17,7 +17,7 @@ export type OutreachTemplate = {
 /** Placeholders swapped in at draft time. Unknown tokens pass through as-is. */
 export const TEMPLATE_PLACEHOLDERS = [
   { token: "{{company}}", meaning: "the company's name" },
-  { token: "{{fit_reason}}", meaning: "one line of why they fit your active thesis (empty if unscored)" },
+  { token: "{{fit_reason}}", meaning: "one founder-facing line on why they caught your eye, auto-written from your active thesis's scoring (empty if unscored)" },
   { token: "{{sender}}", meaning: "your email address" },
 ] as const;
 
